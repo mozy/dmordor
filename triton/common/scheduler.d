@@ -2,28 +2,34 @@ module triton.common.scheduler;
 
 import tango.core.Atomic;
 import tango.core.Thread;
+import tango.core.sync.Condition;
 import tango.util.container.CircularList;
 
 class ThreadPool
 {
 public:
-    this(char[] name, void delegate() proc, int threads = 1, bool useCaller = false)
+    this(char[] name, void delegate() proc, int threads = 1)
     {
         m_name = name;
         m_proc = proc;
         m_threads = new Thread[threads];
+    }
+
+    void start(bool useCaller)
+    {
         foreach (i, t; m_threads) {
             if (useCaller && i == 0) {
                 t = Thread.getThis;
-                t.name = name;
+                t.name = m_name;
                 continue;
             }
-            t = new Thread(proc);
+            t = new Thread(m_proc);
+            t.name = m_name;
             t.start();
         }
 
         if (useCaller) {
-            proc();
+            m_proc();
         }
     }
 
@@ -46,6 +52,11 @@ public:
         synchronized (this) return m_threads.length;
     }
 
+    char[] name()
+    {
+        return m_name;
+    }
+
 private:
     char[] m_name;
     void delegate() m_proc;
@@ -60,10 +71,10 @@ public:
         t_scheduler = new ThreadLocal!(Scheduler)();
     }
 
-    this(char[] name, int threads = 1, bool useCaller = false)
+    this(char[] name, int threads = 1)
     {
         m_fibers = new CircularList!(FiberAndThread)();
-        m_threads = new ThreadPool(name, &run, threads, useCaller);
+        m_threads = new ThreadPool(name, &run, threads);
     }
 
     static void
@@ -80,20 +91,30 @@ public:
         return t_scheduler.val;
     }
 
+    void start(bool useCaller = false)
+    {
+        m_threads.start(useCaller);
+    }
+
     void
     schedule(Fiber f, Thread t = null)
     {
         assert(t is null || m_threads.contains(t));
-        synchronized (m_fibers) m_fibers.append(FiberAndThread(f, t));
+        synchronized (m_fibers) {
+            m_fibers.append(FiberAndThread(f, t));
+            if (m_fibers.size() == 1) {
+                tickle();
+            }
+        }
     }
 
     void
     switchTo(Thread t = null)
     {
-        if (Thread.getThis == t ||
+        /*if (Thread.getThis == t ||
             t is null && m_threads.contains(Thread.getThis)) {
             return;
-        }
+        }*/
         schedule(Fiber.getThis, t);
         Fiber.yield();
     }
@@ -116,14 +137,16 @@ private:
         while (true) {
             Fiber f;
             synchronized (m_fibers) {
-                foreach(ft; m_fibers) {
-                    if (ft.t is null || ft.t == Thread.getThis) {
-                        f = ft.f;
-                        if (f.state == Fiber.State.EXEC) {
-                            continue;
+                if (m_fibers.size() != 0) {
+                    foreach(ft; m_fibers) {
+                        if (ft.t is null || ft.t == Thread.getThis) {
+                            f = ft.f;
+                            if (f.state == Fiber.State.EXEC) {
+                                continue;
+                            }
+                            m_fibers.remove(ft, false);
+                            break;
                         }
-                        m_fibers.remove(ft, false);
-                        break;
                     }
                 }
             }
@@ -156,14 +179,14 @@ class IOManager : Scheduler
 public:
     this()
     {
-        super("IOManager", 1, true);
+        super("IOManager", 1);
     }
 
 protected:
     void idle()
-{}
+    {}
     void tickle()
-{}
+    {}
 }
 
 class WorkerPool : Scheduler
@@ -171,12 +194,31 @@ class WorkerPool : Scheduler
 public:
     this(char[] name, int threads = 1)
     {
+        m_mutex = new Mutex();
+        m_cond = new Condition(m_mutex);
         super(name, threads);
     }
 
 protected:
-    void idle(){}
-    void tickle(){}
+    void idle()
+    {
+        while (true) {
+            synchronized (m_mutex) {
+                m_cond.wait();
+            }
+            Fiber.yield();
+        }
+    }
+    void tickle()
+    {
+        synchronized (m_mutex) {
+            m_cond.notifyAll();
+        }
+    }
+
+private:
+    Mutex m_mutex;
+    Condition m_cond;
 }
 
 /*
