@@ -2,7 +2,7 @@ module triton.common.asyncsocket;
 
 import tango.core.Exception;
 import tango.core.Thread;
-public import tango.net.socket;
+public import tango.net.Socket;
 import tango.io.Stdout;
 
 import triton.common.iomanager;
@@ -82,15 +82,13 @@ version (Windows) {
     public:
         this(AddressFamily family, SocketType type, ProtocolType protocol)
         {
-            m_readEvent = new OverlappedEvent();
-            m_writeEvent = new OverlappedEvent();
             super(family, type, protocol);
             g_ioManager.registerFile(cast(HANDLE)sock);
         }
 
         /+override Socket connect(Address to)
         {
-            m_writeEvent.register();
+            g_ioManager.registerEvent(m_writeEvent);
             if (!ConnectEx(sock, to.name(), to.nameLen(), NULL, 0, NULL, &m_writeEvent.overlapped)) {
                 if (GetLastError() != WSA_IO_PENDING) {
                     exception("Unable to connect socket: ");
@@ -111,7 +109,7 @@ version (Windows) {
 
         override Socket accept (Socket target)
         {
-            m_readEvent.register();
+            g_ioManager.registerEvent(&m_readEvent);
             void[] addrs = new void[64];
             DWORD bytes;
             Stdout.format("accepting: {} {} {} {}\r\n", addrs.ptr, addrs.length, &bytes, &m_readEvent.overlapped);
@@ -138,7 +136,7 @@ version (Windows) {
             WSABUF wsabuf;
             wsabuf.buf = cast(char*)buf.ptr;
             wsabuf.len = buf.length;
-            m_writeEvent.register();
+            g_ioManager.registerEvent(&m_writeEvent);
             int ret = WSASend(sock, &wsabuf, 1, NULL, cast(DWORD)flags,
                 &m_writeEvent.overlapped, NULL);
             if (ret && GetLastError() != WSA_IO_PENDING) {
@@ -147,7 +145,7 @@ version (Windows) {
             Fiber.yield();
             if (!m_writeEvent.ret) {
                 SetLastError(m_writeEvent.lastError);
-                return tango.net.socket.SOCKET_ERROR;
+                return tango.net.Socket.SOCKET_ERROR;
             }
             return m_writeEvent.numberOfBytes;
         }
@@ -160,7 +158,7 @@ version (Windows) {
             WSABUF wsabuf;
             wsabuf.buf = cast(char*)buf.ptr;
             wsabuf.len = buf.length;
-            m_readEvent.register();
+            g_ioManager.registerEvent(&m_readEvent);
             int ret = WSARecv(sock, &wsabuf, 1, NULL, cast(DWORD*)&flags,
                 &m_readEvent.overlapped, NULL);
             if (ret && GetLastError() != WSA_IO_PENDING) {
@@ -169,15 +167,116 @@ version (Windows) {
             Fiber.yield();
             if (!m_readEvent.ret) {
                 SetLastError(m_readEvent.lastError);
-                return tango.net.socket.SOCKET_ERROR;
+                return tango.net.Socket.SOCKET_ERROR;
             }
             return m_readEvent.numberOfBytes;
         }
 
     private:
-        OverlappedEvent m_readEvent;
-        OverlappedEvent m_writeEvent;
+        AsyncEvent m_readEvent;
+        AsyncEvent m_writeEvent;
     }
-} else {
+} else version(linux) {
+    import tango.stdc.errno;
+    import tango.sys.linux.epoll;
 
+    class AsyncSocket : Socket
+    {
+    public:
+        this(AddressFamily family, SocketType type, ProtocolType protocol, bool create=true)
+        {
+            m_readEvent.event.events = EPOLLIN;
+            m_writeEvent.event.events = EPOLLOUT;
+            super(family, type, protocol, create);
+            if (create) {
+                m_readEvent.event.data.fd = sock;
+                m_writeEvent.event.data.fd = sock;
+                blocking = false;
+            }
+        }
+
+        override void blocking(bool byes)
+        {
+            if (byes == false) {
+                super.blocking = false;
+            }
+        }
+
+        override void reopen(socket_t sock = sock.init)
+        {
+            super.reopen(sock);
+            m_readEvent.event.data.fd = this.sock;
+            m_writeEvent.event.data.fd = this.sock;
+            blocking = false;
+        }
+
+        override Socket connect(Address to)
+        {
+            super.connect(to);
+            if (errno == EINPROGRESS) {
+                g_ioManager.registerEvent(&m_writeEvent);
+                Fiber.yield();
+                int err;
+                getOption(SocketOptionLevel.SOCKET, SocketOption.SO_ERROR, (cast(void*)&err)[0..int.sizeof]);
+                if (err != 0) {
+                    errno = err;
+                    exception ("Unable to connect socket: ");
+                }
+            }
+            return this;
+        }
+
+        override Socket accept()
+        {
+            return accept(new AsyncSocket(family, type, protocol, false));
+        }
+
+        override Socket accept (Socket target)
+        {
+            Stdout.formatln("accepting on socket {}", sock);
+            socket_t newsock = .accept(sock, null, null);
+            while (newsock == socket_t.init && errno == EAGAIN) {
+                g_ioManager.registerEvent(&m_readEvent);
+                Fiber.yield();
+                newsock = .accept(sock, null, null);
+            }
+            if (newsock == socket_t.init) {
+                exception("Unable to accept socket connection: ");
+            }
+
+            target.reopen(newsock);
+
+            target.protocol = protocol;
+            target.family = family;
+            target.type = type;
+
+            return target;
+        }
+
+        override int send(void[] buf, SocketFlags flags=SocketFlags.NONE)
+        {
+            int rc = super.send(buf, flags);
+            while (rc == ERROR && errno == EAGAIN) {
+                g_ioManager.registerEvent(&m_writeEvent);
+                Fiber.yield();
+                rc = super.send(buf, flags);
+            }
+            return rc;
+        }
+
+        override int receive(void[] buf, SocketFlags flags=SocketFlags.NONE)
+        {
+            int rc = super.receive(buf, flags);
+            while (rc == ERROR && errno == EAGAIN) {
+                g_ioManager.registerEvent(&m_readEvent);
+                Fiber.yield();
+                rc = super.receive(buf, flags);
+            }
+            return rc;
+        }
+
+    private:
+        AsyncEvent m_readEvent;
+        AsyncEvent m_writeEvent;
+    }
 }

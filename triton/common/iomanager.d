@@ -27,8 +27,9 @@ version(Windows)
             }
         }
 
-        void registerEvent(OverlappedEvent e)
+        void registerEvent(AsyncEvent* e)
         {
+            e._fiber = Fiber.getThis;
             synchronized (this) {
                 assert(!(&e.overlapped in m_pendingEvents));
                 m_pendingEvents[&e.overlapped] = e;
@@ -54,7 +55,7 @@ version(Windows)
                 if (!ret && overlapped == NULL) {
                     throw new Exception("Fail!");
                 }
-                OverlappedEvent e;
+                AsyncEvent* e;
                 
                 synchronized (this) {
                     e = m_pendingEvents[overlapped];
@@ -77,23 +78,12 @@ version(Windows)
 
     private:
         HANDLE m_hCompletionPort;
-        OverlappedEvent[OVERLAPPED*] m_pendingEvents;
+        AsyncEvent*[OVERLAPPED*] m_pendingEvents;
     }
 
-    IOManager g_ioManager;
-
-    class OverlappedEvent
+    struct AsyncEvent
     {
     public:
-        this()
-        {}
-
-        void register()
-        {
-            _fiber = Fiber.getThis;
-            g_ioManager.registerEvent(this);
-        }
-
         BOOL ret;
         OVERLAPPED overlapped;
         DWORD numberOfBytes;
@@ -103,4 +93,124 @@ version(Windows)
     private:
         Fiber _fiber;
     };
+} else version(linux) {
+    import tango.stdc.posix.unistd;
+    import tango.sys.linux.epoll;
+
+    class IOManager : Scheduler
+    {
+    public:
+        this(int threads = 1)
+        {
+            m_epfd = epoll_create(5000);
+            pipe(m_tickleFds);
+            Stdout.formatln("EPoll FD: {}, pipe fds: {} {}", m_epfd, m_tickleFds[0], m_tickleFds[1]);
+            epoll_event event;
+            event.events = EPOLLIN;
+            event.data.fd = m_tickleFds[0];
+            epoll_ctl(m_epfd, EPOLL_CTL_ADD, m_tickleFds[0], &event);
+            super("IOManager", threads);
+        }
+
+        void registerEvent(AsyncEvent* e)
+        {
+            e.event.events &= (EPOLLIN | EPOLLOUT);
+            assert(e.event.events != 0);
+            synchronized (this) {
+                int op;
+                AsyncEvent** current = e.event.data.fd in m_pendingEvents;
+                if (current is null) {
+                    op = EPOLL_CTL_ADD;
+                    m_pendingEvents[e.event.data.fd] = new AsyncEvent();
+                    current = e.event.data.fd in m_pendingEvents;
+                    **current = *e;
+                } else {
+                    op = EPOLL_CTL_MOD;
+                    // OR == XOR means that none of the same bits were set
+                    assert(((*current).event.events | e.event.events)
+                        == ((*current).event.events ^ e.event.events));
+                    (*current).event.events |= e.event.events;
+                }
+                if (e.event.events & EPOLLIN) {
+                    (*current)._fiberIn = Fiber.getThis;
+                }
+                if (e.event.events & EPOLLOUT) {
+                    (*current)._fiberOut = Fiber.getThis;
+                }
+                Stdout.formatln("Registering events {} for fd {}", (*current).event.events,
+                    (*current).event.data.fd);
+                int rc = epoll_ctl(m_epfd, op, (*current).event.data.fd,
+                    &(*current).event);
+                if (rc != 0) {
+                    throw new Exception("Couldn't associate fd with epoll.");
+                }
+            }
+        }
+
+    protected:
+        void idle()
+        {
+            epoll_event[] events = new epoll_event[64];
+            while (true) {
+                Stdout.formatln("idling");
+                int rc = epoll_wait(m_epfd, events.ptr, events.length, -1);
+                Stdout.formatln("Got {} event(s)", rc);
+                if (rc <= 0) {
+                    throw new Exception("Fail!");
+                }
+                
+                foreach (event; events[0..rc]) {
+                    Stdout.formatln("Got events {} for fd {}", event.events, event.data.fd);
+                    if (event.data.fd == m_tickleFds[0]) {
+                        ubyte dummy;
+                        read(m_tickleFds[0], &dummy, 1);
+                        continue;
+                    }
+                    bool err = event.events & EPOLLERR
+                        || event.events & EPOLLHUP;
+                    synchronized (this) {
+                        AsyncEvent* e = m_pendingEvents[event.data.fd];
+                        if (event.events & EPOLLIN ||
+                            err && e.event.events & EPOLLIN) {
+                            schedule(e._fiberIn);
+                        }
+                        if (event.events & EPOLLOUT ||
+                            err && e.event.events & EPOLLOUT) {
+                            schedule(e._fiberOut);
+                        }
+                        e.event.events &= ~event.events;
+                        if (err || e.event.events == 0) {
+                            rc = epoll_ctl(m_epfd, EPOLL_CTL_DEL,
+                                e.event.data.fd, &e.event);
+                            if (rc != 0) {
+                            }
+                            m_pendingEvents.remove(event.data.fd);
+                        }
+                    }
+                }
+
+                Fiber.yield();
+            }
+        }
+
+        void tickle()
+        {
+            write(m_tickleFds[1], "T".ptr, 1);
+        }
+
+    private:
+        int m_epfd;
+        int[2] m_tickleFds;
+        AsyncEvent*[int] m_pendingEvents;
+    }
+
+    struct AsyncEvent
+    {
+    public:
+        epoll_event event;
+    private:
+        Fiber _fiberIn, _fiberOut;
+    };
 }
+
+IOManager g_ioManager;
