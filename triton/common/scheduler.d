@@ -173,7 +173,15 @@ public:
     {
         m_mutex = new Mutex();
         m_cond = new Condition(m_mutex);
+        m_terminate = false;
         super(name, threads);
+    }
+    void stop()
+    {
+        synchronized (m_mutex) {
+            m_cond.notifyAll();
+            m_terminate = true;
+        }
     }
 
 protected:
@@ -181,6 +189,9 @@ protected:
     {
         while (true) {
             synchronized (m_mutex) {
+                if (m_terminate) {
+                    return;
+                }
                 m_cond.wait();
             }
             Fiber.yield();
@@ -196,6 +207,7 @@ protected:
 private:
     Mutex m_mutex;
     Condition m_cond;
+    bool m_terminate;
 }
 
 /*

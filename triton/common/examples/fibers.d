@@ -25,7 +25,7 @@ void main(char[][] args)
     poolA.schedule(new Fiber(&fiberProc));
 
     poolB.start();
-    poolA.start();
+    poolA.start(true);
 }
 
 void fiberProc2()
@@ -53,4 +53,6 @@ void fiberProc()
     Stdout.formatln("In pool {0}", Thread.getThis.name);
     poolA.switchTo();
     Stdout.formatln("In pool {0}", Thread.getThis.name);
+    poolB.stop();
+    poolA.stop();
 }
