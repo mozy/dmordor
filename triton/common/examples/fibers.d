@@ -5,12 +5,15 @@ import tango.io.Stdout;
 import tango.util.container.CircularList;
 
 import triton.common.scheduler;
+import triton.common.iomanager;
+import triton.common.asyncsocket;
 
 WorkerPool poolA;
 WorkerPool poolB;
 
 void main(char[][] args)
 {
+    Socket s = new AsyncSocket(AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
     CircularList!(int) list = new CircularList!(int);
     Stdout.formatln("I'm running2");
 
