@@ -73,7 +73,7 @@ public:
 
     this(char[] name, int threads = 1)
     {
-        m_fibers = new CircularList!(FiberAndThread)();
+        m_fibers = new CircularList!(Fiber)();
         m_threads = new ThreadPool(name, &run, threads);
     }
 
@@ -97,11 +97,11 @@ public:
     }
 
     void
-    schedule(Fiber f, Thread t = null)
+    schedule(Fiber f)
     {
-        assert(t is null || m_threads.contains(t));
+        assert(f);
         synchronized (m_fibers) {
-            m_fibers.append(FiberAndThread(f, t));
+            m_fibers.append(f);
             if (m_fibers.size() == 1) {
                 tickle();
             }
@@ -109,13 +109,12 @@ public:
     }
 
     void
-    switchTo(Thread t = null)
+    switchTo()
     {
-        /*if (Thread.getThis == t ||
-            t is null && m_threads.contains(Thread.getThis)) {
+        /*if (m_threads.contains(Thread.getThis)) {
             return;
         }*/
-        schedule(Fiber.getThis, t);
+        schedule(Fiber.getThis);
         Fiber.yield();
     }
 
@@ -138,15 +137,12 @@ private:
             Fiber f;
             synchronized (m_fibers) {
                 if (m_fibers.size() != 0) {
-                    foreach(ft; m_fibers) {
-                        if (ft.t is null || ft.t == Thread.getThis) {
-                            f = ft.f;
-                            if (f.state == Fiber.State.EXEC) {
-                                continue;
-                            }
-                            m_fibers.remove(ft, false);
-                            break;
+                    foreach(fiber; m_fibers) {
+                        if (fiber.state == Fiber.State.EXEC) {
+                            continue;
                         }
+                        f = fiber;
+                        m_fibers.remove(fiber, false);
                     }
                 }
             }
@@ -164,29 +160,10 @@ private:
     }
 
 private:
-    struct FiberAndThread {
-        Fiber f;
-        Thread t;
-    }
 
     static ThreadLocal!(Scheduler) t_scheduler;
     ThreadPool                     m_threads;
-    CircularList!(FiberAndThread)  m_fibers;
-}
-
-class IOManager : Scheduler
-{
-public:
-    this()
-    {
-        super("IOManager", 1);
-    }
-
-protected:
-    void idle()
-    {}
-    void tickle()
-    {}
+    CircularList!(Fiber)           m_fibers;
 }
 
 class WorkerPool : Scheduler
