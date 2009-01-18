@@ -108,8 +108,7 @@ public:
         }
     }
 
-    void
-    switchTo()
+    void switchTo()
     {
         /*if (m_threads.contains(Thread.getThis)) {
             return;
@@ -242,8 +241,8 @@ parallel_do(void delegate()[] todo) {
             }
         });
         Scheduler.autoschedule(f);
-        Fiber.yield();
     }
+    Fiber.yield();
 }
 
 struct Aggregator(T) {

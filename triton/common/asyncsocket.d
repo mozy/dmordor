@@ -150,6 +150,27 @@ version (Windows) {
             return m_writeEvent.numberOfBytes;
         }
 
+        int send(void[][] bufs, SocketFlags flags=SocketFlags.NONE)
+        {
+            WSABUF[] wsabufs = new WSABUF[bufs.length];
+            foreach (i, buf; bufs) {
+                wsabufs[i].buf = cast(char*)buf.ptr;
+                wsabufs[i].len = buf.length;
+            }
+            g_ioManager.registerEvent(&m_writeEvent);
+            int ret = WSASend(sock, wsabufs.ptr, wsabufs.length, NULL,
+                cast(DWORD)flags, &m_writeEvent.overlapped, NULL);
+            if (ret && GetLastError() != WSA_IO_PENDING) {
+                return ret;
+            }
+            Fiber.yield();
+            if (!m_writeEvent.ret) {
+                SetLastError(m_writeEvent.lastError);
+                return tango.net.Socket.SOCKET_ERROR;
+            }
+            return m_writeEvent.numberOfBytes;
+        }
+
         override int receive(void[] buf, SocketFlags flags=SocketFlags.NONE)
         {
             if (!buf.length)
@@ -172,6 +193,32 @@ version (Windows) {
             return m_readEvent.numberOfBytes;
         }
 
+        int receive(void[][] bufs, SocketFlags flags=SocketFlags.NONE)
+        {
+            if (!bufs.length)
+                badArg ("Socket.receive :: target buffer has 0 length");
+
+            WSABUF[] wsabufs = new WSABUF[bufs.length];
+            foreach (i, buf; bufs) {
+                if (!buf.length)
+                    badArg ("Socket.receive :: target buffer has 0 length");
+                wsabufs[i].buf = cast(char*)buf.ptr;
+                wsabufs[i].len = buf.length;
+            }
+            g_ioManager.registerEvent(&m_readEvent);
+            int ret = WSARecv(sock, wsabufs.ptr, wsabufs.length, NULL,
+                cast(DWORD*)&flags, &m_readEvent.overlapped, NULL);
+            if (ret && GetLastError() != WSA_IO_PENDING) {
+                return ret;
+            }
+            Fiber.yield();
+            if (!m_readEvent.ret) {
+                SetLastError(m_readEvent.lastError);
+                return tango.net.Socket.SOCKET_ERROR;
+            }
+            return m_readEvent.numberOfBytes;
+        }
+
     private:
         AsyncEvent m_readEvent;
         AsyncEvent m_writeEvent;
@@ -179,6 +226,26 @@ version (Windows) {
 } else version(linux) {
     import tango.stdc.errno;
     import tango.sys.linux.epoll;
+
+    struct iovec {
+        void*  iov_base;
+        size_t iov_len;
+    }
+
+    struct msghdr {
+         void*         msg_name;
+         int           msg_namelen;
+         iovec*        msg_iov;
+         size_t        msg_iovlen;
+         void*         msg_control;
+         int           msg_controllen;
+         int           msg_flags;
+    }
+
+    extern (C) {
+        int sendmsg(int s, msghdr *msg, int flags);
+        int recvmsg(int s, msghdr *msg, int flags);
+    }
 
     class AsyncSocket : Socket
     {
@@ -264,6 +331,25 @@ version (Windows) {
             return rc;
         }
 
+        int send(void[][] bufs, SocketFlags flags=SocketFlags.NONE)
+        {
+            msghdr msg;
+            iovec[] iovs = new iovec[bufs.length];
+            foreach (i, buf; bufs) {
+                iovs[i].iov_base = buf.ptr;
+                iovs[i].iov_len = buf.length;
+            }
+            msg.msg_iov = iovs.ptr;
+            msg.msg_iovlen = iovs.length;
+            int rc = sendmsg(sock, &msg, cast(int)flags);
+            while (rc == ERROR && errno == EAGAIN) {
+                g_ioManager.registerEvent(&m_writeEvent);
+                Fiber.yield();
+                rc = sendmsg(sock, &msg, cast(int)flags);
+            }
+            return rc;
+        }
+
         override int receive(void[] buf, SocketFlags flags=SocketFlags.NONE)
         {
             int rc = super.receive(buf, flags);
@@ -271,6 +357,30 @@ version (Windows) {
                 g_ioManager.registerEvent(&m_readEvent);
                 Fiber.yield();
                 rc = super.receive(buf, flags);
+            }
+            return rc;
+        }
+
+        int receive(void[][] bufs, SocketFlags flags=SocketFlags.NONE)
+        {
+            if (!bufs.length)
+                badArg ("Socket.receive :: target buffer has 0 length");
+
+            msghdr msg;
+            iovec[] iovs = new iovec[bufs.length];
+            foreach (i, buf; bufs) {
+                if (!buf.length)
+                    badArg ("Socket.receive :: target buffer has 0 length");
+                iovs[i].iov_base = buf.ptr;
+                iovs[i].iov_len = buf.length;
+            }
+            msg.msg_iov = iovs.ptr;
+            msg.msg_iovlen = iovs.length;
+            int rc = recvmsg(sock, &msg, cast(int)flags);
+            while (rc == ERROR && errno == EAGAIN) {
+                g_ioManager.registerEvent(&m_readEvent);
+                Fiber.yield();
+                rc = recvmsg(sock, &msg, cast(int)flags);
             }
             return rc;
         }
