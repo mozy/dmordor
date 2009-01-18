@@ -166,7 +166,7 @@ version (Windows) {
             Fiber.yield();
             if (!m_writeEvent.ret) {
                 SetLastError(m_writeEvent.lastError);
-                return tango.net.Socket.SOCKET_ERROR;
+                return ERROR;
             }
             return m_writeEvent.numberOfBytes;
         }
@@ -188,7 +188,7 @@ version (Windows) {
             Fiber.yield();
             if (!m_readEvent.ret) {
                 SetLastError(m_readEvent.lastError);
-                return tango.net.Socket.SOCKET_ERROR;
+                return ERROR;
             }
             return m_readEvent.numberOfBytes;
         }
