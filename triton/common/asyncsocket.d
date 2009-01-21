@@ -7,6 +7,13 @@ import tango.io.Stdout;
 
 import triton.common.iomanager;
 
+version(linux) {
+    version = epoll;
+}
+version(darwin) {
+    version = kqueue;
+}
+
 version (Windows) {
     import win32.basetyps;
     import win32.mswsock;
@@ -223,9 +230,9 @@ version (Windows) {
         AsyncEvent m_readEvent;
         AsyncEvent m_writeEvent;
     }
-} else version(linux) {
+} else version(Posix) {
     import tango.stdc.errno;
-    import tango.sys.linux.epoll;
+    version (epoll) import tango.sys.linux.epoll;
 
     struct iovec {
         void*  iov_base;
@@ -252,12 +259,22 @@ version (Windows) {
     public:
         this(AddressFamily family, SocketType type, ProtocolType protocol, bool create=true)
         {
-            m_readEvent.event.events = EPOLLIN;
-            m_writeEvent.event.events = EPOLLOUT;
+            version (epoll) {
+                m_readEvent.event.events = EPOLLIN;
+                m_writeEvent.event.events = EPOLLOUT;
+            } else version (kqueue) {
+                m_readEvent.event.filter = EVFILT_READ;
+                m_writeEvent.event.filter = EVFILT_WRITE;
+            }
             super(family, type, protocol, create);
             if (create) {
-                m_readEvent.event.data.fd = sock;
-                m_writeEvent.event.data.fd = sock;
+                version (epoll) {
+                    m_readEvent.event.data.fd = sock;
+                    m_writeEvent.event.data.fd = sock;
+                } else version (kqueue) {
+                    m_readEvent.event.ident = sock;
+                    m_writeEvent.event.ident = sock;
+                }
                 blocking = false;
             }
         }
@@ -269,11 +286,16 @@ version (Windows) {
             }
         }
 
-        override void reopen(socket_t sock = sock.init)
+        void reopen(socket_t sock = sock.init)
         {
             super.reopen(sock);
-            m_readEvent.event.data.fd = this.sock;
-            m_writeEvent.event.data.fd = this.sock;
+            version (epoll) {
+                m_readEvent.event.data.fd = this.sock;
+                m_writeEvent.event.data.fd = this.sock;
+            } else version (kqueue) {
+                m_readEvent.event.ident = this.sock;
+                m_writeEvent.event.ident = this.sock;
+            }
             blocking = false;
         }
 

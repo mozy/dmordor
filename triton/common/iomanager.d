@@ -5,6 +5,13 @@ import tango.io.Stdout;
 
 public import triton.common.scheduler;
 
+version(linux) {
+    version = epoll;
+}
+version(darwin) {
+    version = kqueue;
+}
+
 version(Windows)
 {
     import win32.winbase;
@@ -93,7 +100,7 @@ version(Windows)
     private:
         Fiber _fiber;
     };
-} else version(linux) {
+} else version(epoll) {
     import tango.stdc.posix.unistd;
     import tango.sys.linux.epoll;
 
@@ -210,6 +217,133 @@ version(Windows)
         epoll_event event;
     private:
         Fiber _fiberIn, _fiberOut;
+    };
+} else version(kqueue) {
+    import tango.stdc.posix.unistd;
+    
+    struct timespec {
+        time_t tv_sec;
+        int    tv_nsec;
+    };
+
+
+    const short EVFILT_READ     = -1;
+    const short EVFILT_WRITE    = -2;
+    const short EVFILT_AIO      = -3;
+    const short EVFILT_VNODE    = -4;
+    const short EVFILT_PROC     = -5;
+    const short EVFILT_SIGNAL   = -6;
+    const short EVFILT_TIMER    = -7;
+    const short EVFILT_MACHPORT = -8;
+    const short EVFILT_FS       = -9;
+
+    align(4) struct struct_kevent {
+        size_t    ident;
+        short     filter;
+        ushort    flags;
+        uint      fflags;
+        ptrdiff_t data;
+        void*     udata;
+    }
+
+    void EV_SET(ref struct_kevent event, int ident, short filter, ushort flags, uint fflags, ptrdiff_t data, void* udata)
+    {
+        event.ident = ident;
+        event.filter = filter;
+        event.flags = flags;
+        event.fflags = fflags;
+        event.data = data;
+        event.udata = udata;
+    }
+
+    const ushort EV_ADD     = 0x0001;
+    const ushort EV_DELETE  = 0x0002;
+    const ushort EV_ENABLE  = 0x0004;
+    const ushort EV_DISABLE = 0x0008;
+    const ushort EV_RECEIPT = 0x0040;
+
+    const ushort EV_ONESHOT = 0x0010;
+    const ushort EV_CLEAR   = 0x0020;
+
+    const ushort EV_EOF     = 0x8000;
+    const ushort EV_ERROR   = 0x4000;
+
+    extern (C) {
+        int kqueue();
+        int kevent(int kq, struct_kevent* changelist, int nchanges, struct_kevent* eventlist, int nevents, timespec* timeout);
+    }
+
+    class IOManager : Scheduler
+    {
+    public:
+        this(int threads = 1)
+        {
+            m_kqfd = kqueue();
+            pipe(m_tickleFds);
+            Stdout.formatln("KQueue FD: {}, pipe fds: {} {}", m_kqfd, m_tickleFds[0], m_tickleFds[1]);
+            struct_kevent event;
+            EV_SET(event, m_tickleFds[0], EVFILT_READ, EV_ADD, 0, 0, null);
+            kevent(m_kqfd, &event, 1, null, 0, null);
+            super("IOManager", threads);
+        }
+
+        void registerEvent(AsyncEvent* e)
+        {
+            e.event.flags = EV_ADD;
+            e.event.udata = cast(void*)Fiber.getThis;
+            int rc = kevent(m_kqfd, &e.event, 1, null, 0, null);
+            if (rc != 0) {
+                throw new Exception("Couldn't associate kevent with kqueue.");
+            }
+        }
+
+    protected:
+        void idle()
+        {
+            struct_kevent[] events = new struct_kevent[64];
+            while (true) {
+                Stdout.formatln("idling");
+                int rc = kevent(m_kqfd, null, 0, events.ptr, events.length, null);
+                Stdout.formatln("Got {} event(s)", rc);
+                if (rc <= 0) {
+                    throw new Exception("Fail!");
+                }
+                
+                foreach (event; events[0..rc]) {
+                    Stdout.formatln("Got events {} for fd {}", event.filter, event.ident);
+                    if (event.ident == m_tickleFds[0]) {
+                        ubyte dummy;
+                        read(m_tickleFds[0], &dummy, 1);
+                        continue;
+                    }
+
+                    event.flags = EV_DELETE;
+                    rc = kevent(m_kqfd, &event, 1, null, 0, null);
+                    if (rc != 0) {
+                    }
+
+                    Fiber f = cast(Fiber)event.udata;
+                    schedule(f);
+                }
+
+                Fiber.yield();
+            }
+        }
+
+        void tickle()
+        {
+            write(m_tickleFds[1], "T".ptr, 1);
+        }
+
+    private:
+        int m_kqfd;
+        int[2] m_tickleFds;
+    }
+
+    struct AsyncEvent
+    {
+    public:
+        struct_kevent event;
     };
 }
 
