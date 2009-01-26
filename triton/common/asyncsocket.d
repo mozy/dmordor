@@ -70,7 +70,6 @@ version (Windows) {
             &bytes,
             NULL,
             NULL);
-        Stdout.format("Got acceptex: {}", bytes);
         WSAIoctl(s.sock,
             SIO_GET_EXTENSION_FUNCTION_POINTER,
             &WSAID_CONNECTEX,
@@ -93,10 +92,12 @@ version (Windows) {
             g_ioManager.registerFile(cast(HANDLE)sock);
         }
 
-        /+override Socket connect(Address to)
+        override Socket connect(Address to)
         {
-            g_ioManager.registerEvent(m_writeEvent);
-            if (!ConnectEx(sock, to.name(), to.nameLen(), NULL, 0, NULL, &m_writeEvent.overlapped)) {
+            // Need to be bound, even to ADDR_ANY, before calling ConnectEx
+            bind(newFamilyObject());
+            g_ioManager.registerEvent(&m_writeEvent);
+            if (!ConnectEx(sock, cast(SOCKADDR*)to.name(), to.nameLen(), NULL, 0, NULL, &m_writeEvent.overlapped)) {
                 if (GetLastError() != WSA_IO_PENDING) {
                     exception("Unable to connect socket: ");
                 }
@@ -107,7 +108,7 @@ version (Windows) {
                 exception("Unable to connect socket: ");
             }
             return this;
-        }+/
+        }
 
         override Socket accept()
         {
