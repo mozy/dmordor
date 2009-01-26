@@ -36,6 +36,7 @@ version(Windows)
 
         void registerEvent(AsyncEvent* e)
         {
+            e._scheduler = Scheduler.current;
             e._fiber = Fiber.getThis;
             synchronized (this) {
                 assert(!(&e.overlapped in m_pendingEvents));
@@ -73,7 +74,7 @@ version(Windows)
                 e.numberOfBytes = numberOfBytes;
                 e.completionKey = completionKey;
                 e.lastError = GetLastError();
-                schedule(e._fiber);
+                e._scheduler.schedule(e._fiber);
                 Fiber.yield();
             }
         }
@@ -98,6 +99,7 @@ version(Windows)
         DWORD lastError;
 
     private:
+        Scheduler _scheduler;
         Fiber _fiber;
     };
 } else version(epoll) {
@@ -139,9 +141,11 @@ version(Windows)
                     (*current).event.events |= e.event.events;
                 }
                 if (e.event.events & EPOLLIN) {
+                    (*current)._schedulerIn = Scheduler.current;
                     (*current)._fiberIn = Fiber.getThis;
                 }
                 if (e.event.events & EPOLLOUT) {
+                    (*current)._schedulerOut = Scheduler.current;
                     (*current)._fiberOut = Fiber.getThis;
                 }
                 Stdout.formatln("Registering events {} for fd {}", (*current).event.events,
@@ -179,11 +183,11 @@ version(Windows)
                         AsyncEvent* e = m_pendingEvents[event.data.fd];
                         if (event.events & EPOLLIN ||
                             err && e.event.events & EPOLLIN) {
-                            schedule(e._fiberIn);
+                            e._schedulerIn.schedule(e._fiberIn);
                         }
                         if (event.events & EPOLLOUT ||
                             err && e.event.events & EPOLLOUT) {
-                            schedule(e._fiberOut);
+                            e._schedulerOut.schedule(e._fiberOut);
                         }
                         e.event.events &= ~event.events;
                         if (err || e.event.events == 0) {
@@ -216,6 +220,7 @@ version(Windows)
     public:
         epoll_event event;
     private:
+        Scheduler _schedulerIn, _schedulerOut;
         Fiber _fiberIn, _fiberOut;
     };
 } else version(kqueue) {
