@@ -179,6 +179,75 @@ version (Windows) {
             return m_writeEvent.numberOfBytes;
         }
 
+        override int sendTo(void[] buf, SocketFlags flags, Address to)
+        {
+            WSABUF wsabuf;
+            wsabuf.buf = cast(char*)buf.ptr;
+            wsabuf.len = buf.length;
+            g_ioManager.registerEvent(&m_writeEvent);
+            int ret = WSASendTo(sock, &wsabuf, 1, NULL, cast(DWORD)flags,
+                cast(SOCKADDR*)to.name(), to.nameLen(),
+                &m_writeEvent.overlapped, NULL);
+            if (ret && GetLastError() != WSA_IO_PENDING) {
+                return ret;
+            }
+            Fiber.yield();
+            if (!m_writeEvent.ret) {
+                SetLastError(m_writeEvent.lastError);
+                return tango.net.Socket.SOCKET_ERROR;
+            }
+            return m_writeEvent.numberOfBytes;
+        }
+
+        int sendTo(void[][] bufs, SocketFlags flags, Address to)
+        {
+            WSABUF[] wsabufs = new WSABUF[bufs.length];
+            foreach (i, buf; bufs) {
+                wsabufs[i].buf = cast(char*)buf.ptr;
+                wsabufs[i].len = buf.length;
+            }
+            g_ioManager.registerEvent(&m_writeEvent);
+            int ret = WSASendTo(sock, wsabufs.ptr, wsabufs.length, NULL,
+                cast(DWORD)flags, cast(SOCKADDR*)to.name(), to.nameLen(),
+                &m_writeEvent.overlapped, NULL);
+            if (ret && GetLastError() != WSA_IO_PENDING) {
+                return ret;
+            }
+            Fiber.yield();
+            if (!m_writeEvent.ret) {
+                SetLastError(m_writeEvent.lastError);
+                return tango.net.Socket.SOCKET_ERROR;
+            }
+            return m_writeEvent.numberOfBytes;
+        }
+
+        int sendTo(void[][] bufs, Address to)
+        {
+            return sendTo(bufs, SocketFlags.NONE, to);
+        }
+
+        int sendTo(void[][] bufs, SocketFlags flags=SocketFlags.NONE)
+        {
+            WSABUF[] wsabufs = new WSABUF[bufs.length];
+            foreach (i, buf; bufs) {
+                wsabufs[i].buf = cast(char*)buf.ptr;
+                wsabufs[i].len = buf.length;
+            }
+            g_ioManager.registerEvent(&m_writeEvent);
+            int ret = WSASendTo(sock, wsabufs.ptr, wsabufs.length, NULL,
+                cast(DWORD)flags, NULL, 0,
+                &m_writeEvent.overlapped, NULL);
+            if (ret && GetLastError() != WSA_IO_PENDING) {
+                return ret;
+            }
+            Fiber.yield();
+            if (!m_writeEvent.ret) {
+                SetLastError(m_writeEvent.lastError);
+                return tango.net.Socket.SOCKET_ERROR;
+            }
+            return m_writeEvent.numberOfBytes;
+        }
+
         override int receive(void[] buf, SocketFlags flags=SocketFlags.NONE)
         {
             if (!buf.length)
@@ -216,6 +285,89 @@ version (Windows) {
             g_ioManager.registerEvent(&m_readEvent);
             int ret = WSARecv(sock, wsabufs.ptr, wsabufs.length, NULL,
                 cast(DWORD*)&flags, &m_readEvent.overlapped, NULL);
+            if (ret && GetLastError() != WSA_IO_PENDING) {
+                return ret;
+            }
+            Fiber.yield();
+            if (!m_readEvent.ret) {
+                SetLastError(m_readEvent.lastError);
+                return tango.net.Socket.SOCKET_ERROR;
+            }
+            return m_readEvent.numberOfBytes;
+        }
+
+        override int receiveFrom(void[] buf, SocketFlags flags, Address from)
+        {
+            if (!buf.length)
+                badArg ("Socket.receiveFrom :: target buffer has 0 length");
+
+            WSABUF wsabuf;
+            wsabuf.buf = cast(char*)buf.ptr;
+            wsabuf.len = buf.length;
+            int nameLen = from.nameLen();
+            g_ioManager.registerEvent(&m_readEvent);
+            int ret = WSARecvFrom(sock, &wsabuf, 1, NULL, cast(DWORD*)&flags,
+                cast(SOCKADDR*)from.name(), &nameLen,
+                &m_readEvent.overlapped, NULL);
+            if (ret && GetLastError() != WSA_IO_PENDING) {
+                return ret;
+            }
+            Fiber.yield();
+            if (!m_readEvent.ret) {
+                SetLastError(m_readEvent.lastError);
+                return ERROR;
+            }
+            return m_readEvent.numberOfBytes;
+        }
+
+        int receiveFrom(void[][] bufs, SocketFlags flags, Address from)
+        {
+            if (!bufs.length)
+                badArg ("Socket.receiveFrom :: target buffer has 0 length");
+
+            WSABUF[] wsabufs = new WSABUF[bufs.length];
+            foreach (i, buf; bufs) {
+                if (!buf.length)
+                    badArg ("Socket.receiveFrom :: target buffer has 0 length");
+                wsabufs[i].buf = cast(char*)buf.ptr;
+                wsabufs[i].len = buf.length;
+            }
+            int nameLen = from.nameLen();
+            g_ioManager.registerEvent(&m_readEvent);
+            int ret = WSARecvFrom(sock, wsabufs.ptr, wsabufs.length, NULL,
+                cast(DWORD*)&flags, cast(SOCKADDR*)from.name(), &nameLen,
+                &m_readEvent.overlapped, NULL);
+            if (ret && GetLastError() != WSA_IO_PENDING) {
+                return ret;
+            }
+            Fiber.yield();
+            if (!m_readEvent.ret) {
+                SetLastError(m_readEvent.lastError);
+                return tango.net.Socket.SOCKET_ERROR;
+            }
+            return m_readEvent.numberOfBytes;
+        }
+
+        int receiveFrom(void[][] bufs, Address from)
+        {
+            return receiveFrom(bufs, SocketFlags.NONE, from);
+        }
+
+        int receiveFrom(void[][] bufs, SocketFlags flags = SocketFlags.NONE) {
+            if (!bufs.length)
+                badArg ("Socket.receiveFrom :: target buffer has 0 length");
+
+            WSABUF[] wsabufs = new WSABUF[bufs.length];
+            foreach (i, buf; bufs) {
+                if (!buf.length)
+                    badArg ("Socket.receiveFrom :: target buffer has 0 length");
+                wsabufs[i].buf = cast(char*)buf.ptr;
+                wsabufs[i].len = buf.length;
+            }
+            g_ioManager.registerEvent(&m_readEvent);
+            int ret = WSARecvFrom(sock, wsabufs.ptr, wsabufs.length, NULL,
+                cast(DWORD*)&flags, NULL, NULL,
+                &m_readEvent.overlapped, NULL);
             if (ret && GetLastError() != WSA_IO_PENDING) {
                 return ret;
             }
