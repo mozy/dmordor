@@ -351,7 +351,8 @@ version (Windows) {
             return receiveFrom(bufs, SocketFlags.NONE, from);
         }
 
-        int receiveFrom(void[][] bufs, SocketFlags flags = SocketFlags.NONE) {
+        int receiveFrom(void[][] bufs, SocketFlags flags = SocketFlags.NONE)
+        {
             if (!bufs.length)
                 badArg ("Socket.receiveFrom :: target buffer has 0 length");
 
@@ -521,7 +522,49 @@ version (Windows) {
             }
             return rc;
         }
-
+        
+        override int sendTo(void[] buf, SocketFlags flags, Address to)
+        {
+            int rc = super.sendTo(buf, flags, to);
+            while (rc == ERROR && errno == EAGAIN) {
+                g_ioManager.registerEvent(&m_writeEvent);
+                Fiber.yield();
+                rc = super.send(buf, flags);
+            }
+            return rc;
+        }
+        
+        int sendTo(void[][] bufs, SocketFlags flags, Address to)
+        {
+            msghdr msg;
+            msg.msg_name = to.name();
+            msg.msg_namelen = to.nameLen();
+            iovec[] iovs = new iovec[bufs.length];
+            foreach (i, buf; bufs) {
+                iovs[i].iov_base = buf.ptr;
+                iovs[i].iov_len = buf.length;
+            }
+            msg.msg_iov = iovs.ptr;
+            msg.msg_iovlen = iovs.length;
+            int rc = sendmsg(sock, &msg, cast(int)flags);
+            while (rc == ERROR && errno == EAGAIN) {
+                g_ioManager.registerEvent(&m_writeEvent);
+                Fiber.yield();
+                rc = sendmsg(sock, &msg, cast(int)flags);
+            }
+            return rc;
+        }
+        
+        int sendTo(void[][] bufs, Address to)
+        {
+            return sendTo(bufs, SocketFlags.NONE, to);
+        }
+        
+        int sendTo(void[][] bufs, SocketFlags flags=SocketFlags.NONE)
+        {
+            return send(bufs, flags);   
+        }
+        
         override int receive(void[] buf, SocketFlags flags=SocketFlags.NONE)
         {
             int rc = super.receive(buf, flags);
@@ -555,6 +598,53 @@ version (Windows) {
                 rc = recvmsg(sock, &msg, cast(int)flags);
             }
             return rc;
+        }
+        
+        override int receiveFrom(void[] buf, SocketFlags flags, Address from)
+        {
+            int rc = super.receiveFrom(buf, flags, from);
+            while (rc == ERROR && errno == EAGAIN) {
+                g_ioManager.registerEvent(&m_readEvent);
+                Fiber.yield();
+                rc = super.receiveFrom(buf, flags, from);
+            }
+            return rc;            
+        }
+        
+        int receiveFrom(void[][] bufs, SocketFlags flags, Address from)
+        {
+            if (!bufs.length)
+                badArg ("Socket.receive :: target buffer has 0 length");
+
+            msghdr msg;
+            msg.msg_name = from.name();
+            msg.msg_namelen = from.nameLen();
+            iovec[] iovs = new iovec[bufs.length];
+            foreach (i, buf; bufs) {
+                if (!buf.length)
+                    badArg ("Socket.receive :: target buffer has 0 length");
+                iovs[i].iov_base = buf.ptr;
+                iovs[i].iov_len = buf.length;
+            }
+            msg.msg_iov = iovs.ptr;
+            msg.msg_iovlen = iovs.length;
+            int rc = recvmsg(sock, &msg, cast(int)flags);
+            while (rc == ERROR && errno == EAGAIN) {
+                g_ioManager.registerEvent(&m_readEvent);
+                Fiber.yield();
+                rc = recvmsg(sock, &msg, cast(int)flags);
+            }
+            return rc;
+        }
+        
+        int receiveFrom(void[][] bufs, Address from)
+        {
+            return receiveFrom(bufs, SocketFlags.NONE, from);
+        }
+        
+        int receiveFrom(void[][] bufs, SocketFlags flags=SocketFlags.NONE)
+        {
+            return receive(bufs, flags);
         }
 
     private:
