@@ -33,7 +33,7 @@ void main(char[][] args)
     }
 
     if (runClient) {
-        Stdout.formatln("# total_conns total_time num_ops avg_time "
+        Stdout.formatln("# total_conns total_time_usec num_ops avg_time_usec "
 	           "ops_per_sec bw_mbps");
         g_clients = new Fiber[g_totalConns];
         ClientConnection.startTest(1);
@@ -52,14 +52,17 @@ public:
 
     void run()
     {
+        scope (exit) sock.shutdown(SocketShutdown.BOTH);
         while(true) {
             ubyte[1] buffer;
             int rc = sock.receive(buffer);
             if (rc <= 0) {
+                Stdout.formatln("Server couldn't receive: {}", rc);
                 return;
             }
             rc = sock.send(buffer);
             if (rc <= 0) {
+                Stdout.formatln("Server couldn't send: {}", rc);
                 return;
             }
         }
@@ -117,16 +120,15 @@ public:
             while (read < g_iters) {
                 rc = s.send(buffer);
                 if (rc != 1) {
-                    throw new Exception("uh oh");
+                    Stdout.formatln("couldn't send because {}", rc);
+                    throw new Exception("uh oh 1");
                 }
                 rc = s.receive(buffer);
                 if (rc != 1) {
-                    throw new Exception("uh oh");
+                    throw new Exception("uh oh 2");
                 }
                 ++read;
             }
-            s.shutdown(SocketShutdown.BOTH);
-            s.detach();
 
             if (atomicIncrement(g_numDone) == g_connected) {
                 g_lastElapsed = g_stopwatch.stop();
@@ -138,9 +140,9 @@ public:
                 double bytes = ops;
                 double bw = bytes / elapsed / 1000 / 1000;
 
-                Stdout.formatln("{} {} {} {} {}", elapsed, ops, average, opsSec, bw);
+                Stdout.formatln("{:.0f} {:.0f} {:.0f} {:.0f} {:.2f}", elapsed * 1_000_000, ops, average * 1_000_000, opsSec, bw);
 
-                if (g_clients.length == g_totalConns) {
+                if (g_connected == g_totalConns) {
                     // Don't bother cleaning up, just exit
                     assert(false);
                 }
@@ -166,7 +168,7 @@ public:
 	    } else {
 	        // If we are doing a power of 2 progression, try to run for at
 	        // least 5 seconds
-	        double target = g_powTwo ? 5 : 0.1;
+	        double target = g_powTwo ? 5 : 0.001;
 	        int numOps = g_prevActive * g_lastIters;
             double optime = g_lastElapsed / numOps;
 

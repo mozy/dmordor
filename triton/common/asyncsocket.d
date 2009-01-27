@@ -120,11 +120,9 @@ version (Windows) {
             g_ioManager.registerEvent(&m_readEvent);
             void[] addrs = new void[64];
             DWORD bytes;
-            Stdout.format("accepting: {} {} {} {}\r\n", addrs.ptr, addrs.length, &bytes, &m_readEvent.overlapped);
             BOOL ret = AcceptEx(sock, target.sock, addrs.ptr, addrs.length, (addrs.length - 16) / 2, (addrs.length - 16) / 2, &bytes,
                 &m_readEvent.overlapped);
             if (!ret && GetLastError() != WSA_IO_PENDING) {
-                Stdout.format("accept ex: {}, {}, {}, {}", ret, GetLastError(), sock, target.sock);
                 exception(
                     "Unable to accept socket connection");
             }
@@ -475,7 +473,6 @@ version (Windows) {
 
         override Socket accept (Socket target)
         {
-            Stdout.formatln("accepting on socket {}", sock);
             socket_t newsock = .accept(sock, null, null);
             while (newsock == socket_t.init && errno == EAGAIN) {
                 g_ioManager.registerEvent(&m_readEvent);

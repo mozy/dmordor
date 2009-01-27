@@ -113,7 +113,6 @@ version(Windows)
         {
             m_epfd = epoll_create(5000);
             pipe(m_tickleFds);
-            Stdout.formatln("EPoll FD: {}, pipe fds: {} {}", m_epfd, m_tickleFds[0], m_tickleFds[1]);
             epoll_event event;
             event.events = EPOLLIN;
             event.data.fd = m_tickleFds[0];
@@ -148,8 +147,8 @@ version(Windows)
                     (*current)._schedulerOut = Scheduler.current;
                     (*current)._fiberOut = Fiber.getThis;
                 }
-                Stdout.formatln("Registering events {} for fd {}", (*current).event.events,
-                    (*current).event.data.fd);
+                //Stdout.formatln("Registering events {} for fd {}", (*current).event.events,
+                //    (*current).event.data.fd);
                 int rc = epoll_ctl(m_epfd, op, (*current).event.data.fd,
                     &(*current).event);
                 if (rc != 0) {
@@ -163,15 +162,15 @@ version(Windows)
         {
             epoll_event[] events = new epoll_event[64];
             while (true) {
-                Stdout.formatln("idling");
+                //Stdout.formatln("idling");
                 int rc = epoll_wait(m_epfd, events.ptr, events.length, -1);
-                Stdout.formatln("Got {} event(s)", rc);
+                //Stdout.formatln("Got {} event(s)", rc);
                 if (rc <= 0) {
                     throw new Exception("Fail!");
                 }
                 
                 foreach (event; events[0..rc]) {
-                    Stdout.formatln("Got events {} for fd {}", event.events, event.data.fd);
+                    //Stdout.formatln("Got events {} for fd {}", event.events, event.data.fd);
                     if (event.data.fd == m_tickleFds[0]) {
                         ubyte dummy;
                         read(m_tickleFds[0], &dummy, 1);
