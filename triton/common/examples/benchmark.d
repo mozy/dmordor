@@ -4,6 +4,7 @@ import tango.core.Atomic;
 import tango.core.Thread;
 import tango.io.Stdout;
 import tango.math.Math;
+import tango.net.InternetAddress;
 import tango.time.StopWatch;
 
 import triton.common.asyncsocket;
@@ -21,7 +22,7 @@ void main(char[][] args)
     if (runServer) {
         g_ioManager.schedule(new Fiber(delegate void() {
             Socket s = new AsyncSocket(AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
-            s.bind(new IPv4Address("127.0.0.1", SERVER_PORT));
+            s.bind(new InternetAddress("127.0.0.1", SERVER_PORT));
             s.listen(10);
 
             while(true) {
@@ -99,7 +100,7 @@ public:
     static void run()
     {
         Socket s = new AsyncSocket(AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
-        s.connect(new IPv4Address("127.0.0.1", SERVER_PORT));
+        s.connect(new InternetAddress("127.0.0.1", SERVER_PORT));
 
         if (atomicIncrement(g_connected) == g_numNew) {
             Stdout.format("{} ", g_connected);

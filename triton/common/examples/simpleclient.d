@@ -2,6 +2,7 @@ module triton.common.examples.simpleclient;
 
 import tango.core.Thread;
 import tango.io.Stdout;
+import tango.net.InternetAddress;
 import tango.util.Convert;
 
 import triton.common.asyncsocket;
@@ -13,7 +14,7 @@ void main(char[][] args)
 
     g_ioManager.schedule(new Fiber(delegate void() {
         Socket s = new AsyncSocket(AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
-        s.connect(new IPv4Address(args[1], to!(int)(args[2])));
+        s.connect(new InternetAddress(args[1], to!(int)(args[2])));
         int rc = s.send("hello\r\n");
         if (rc <= 0) {
             return;

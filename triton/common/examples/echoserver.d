@@ -2,6 +2,7 @@ module triton.common.examples.echoserver;
 
 import tango.core.Thread;
 import tango.io.Stdout;
+import tango.net.InternetAddress;
 
 import triton.common.asyncsocket;
 import triton.common.iomanager;
@@ -49,7 +50,7 @@ private:
 void fiberMain()
 {
     Socket s = new AsyncSocket(AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
-    s.bind(new IPv4Address("127.0.0.1", 8000));
+    s.bind(new InternetAddress("127.0.0.1", 8000));
     s.listen(10);
 
     while(true) {
