@@ -142,6 +142,7 @@ private:
                         }
                         f = fiber;
                         m_fibers.remove(fiber, false);
+                        break;
                     }
                 }
             }
