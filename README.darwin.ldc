@@ -1,0 +1,32 @@
+Install MacPorts (or manually install the following software): http://www.macports.org/
+
+sudo port install git-core
+sudo port install mercurial
+sudo port install llvm
+sudo port install cmake
+
+Pick your source directory, go there
+
+git clone svn://icarus.dechocorp.com/var/lib/git/mordor.git mordor
+hg clone http://hg.dsource.org/projects/ldc ldc
+svn co http://svn.dsource.org/projects/tango/trunk ldc/tango
+cd ldc/tango
+patch -p0 < ../../mordor/patches/tango/*
+cd ..
+ccmake ./
+<press c>
+<press c>
+<press g>
+make
+make runtime
+
+Add ldc/bin to your $PATH (probably in your .bashrc).
+
+Install dsss: http://dsource.org/projects/dsss
+
+sudo ln -s <pathtoldc>/ldc-tango /usr/etc/rebuild/ldc-tango
+
+Edit /usr/etc/rebuild/default to be profile=ldc-tango
+
+Go to your mordor checkout, and run dsss build
+
