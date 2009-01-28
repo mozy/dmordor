@@ -1,0 +1,40 @@
+Index: tango/net/Socket.d
+===================================================================
+--- tango/net/Socket.d	(revision 4298)
++++ tango/net/Socket.d	(working copy)
+@@ -181,7 +181,7 @@
+         {
+         private import tango.stdc.errno;
+ 
+-        private typedef int socket_t = -1;
++        typedef int socket_t = -1;
+ 
+         private const int F_GETFL       = 3;
+         private const int F_SETFL       = 4;
+@@ -1476,8 +1476,8 @@
+ 
+ abstract class Address
+ {
+-        protected sockaddr* name();
+-        protected int nameLen();
++        sockaddr* name();
++        int nameLen();
+         AddressFamily addressFamily();
+         char[] toString();
+ 
+@@ -1505,6 +1505,7 @@
+         protected:
+         sockaddr sa;
+ 
++        public:
+ 
+         /***********************************************************************
+ 
+@@ -1754,6 +1755,7 @@
+ 
+         sockaddr_in sin;
+ 
++        public:
+ 
+         /***********************************************************************
+ 
