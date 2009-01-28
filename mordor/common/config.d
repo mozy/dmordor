@@ -1,9 +1,9 @@
-module triton.common.config;
+module mordor.common.config;
 
 import tango.core.Atomic;
 import tango.util.Convert;
 
-import triton.common.stringutils;
+import mordor.common.stringutils;
 
 class ConfigVarBase
 {

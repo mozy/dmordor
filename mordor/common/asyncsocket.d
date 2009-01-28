@@ -1,11 +1,11 @@
-module triton.common.asyncsocket;
+module mordor.common.asyncsocket;
 
 import tango.core.Exception;
 import tango.core.Thread;
 public import tango.net.Socket;
 import tango.io.Stdout;
 
-import triton.common.iomanager;
+import mordor.common.iomanager;
 
 version(linux) {
     version = epoll;

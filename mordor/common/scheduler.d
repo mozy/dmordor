@@ -1,4 +1,4 @@
-module triton.common.scheduler;
+module mordor.common.scheduler;
 
 import tango.core.Atomic;
 import tango.core.Thread;

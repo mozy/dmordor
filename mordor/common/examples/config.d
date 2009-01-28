@@ -1,9 +1,9 @@
-module triton.common.examples.config;
+module mordor.common.examples.config;
 
 import tango.io.Stdout;
 
-import triton.common.config;
-import triton.common.stringutils;
+import mordor.common.config;
+import mordor.common.stringutils;
 
 void main(string[] args)
 {

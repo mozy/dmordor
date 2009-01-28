@@ -1,9 +1,9 @@
-module triton.common.examples.fibers;
+module mordor.common.examples.fibers;
 
 import tango.core.Thread;
 import tango.io.Stdout;
 
-import triton.common.scheduler;
+import mordor.common.scheduler;
 
 WorkerPool poolA;
 WorkerPool poolB;

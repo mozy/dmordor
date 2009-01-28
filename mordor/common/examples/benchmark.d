@@ -1,4 +1,4 @@
-module triton.common.examples.benchmark;
+module mordor.common.examples.benchmark;
 
 import tango.core.Atomic;
 import tango.core.Thread;
@@ -7,8 +7,8 @@ import tango.math.Math;
 import tango.net.InternetAddress;
 import tango.time.StopWatch;
 
-import triton.common.asyncsocket;
-import triton.common.iomanager;
+import mordor.common.asyncsocket;
+import mordor.common.iomanager;
 
 const int SERVER_PORT = 60000;
 

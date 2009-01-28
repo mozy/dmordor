@@ -1,11 +1,11 @@
-module triton.common.examples.echoserver;
+module mordor.common.examples.echoserver;
 
 import tango.core.Thread;
 import tango.io.Stdout;
 import tango.net.InternetAddress;
 
-import triton.common.asyncsocket;
-import triton.common.iomanager;
+import mordor.common.asyncsocket;
+import mordor.common.iomanager;
 
 void main(char[][])
 {

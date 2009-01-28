@@ -1,12 +1,12 @@
-module triton.common.examples.simpleclient;
+module mordor.common.examples.simpleclient;
 
 import tango.core.Thread;
 import tango.io.Stdout;
 import tango.net.InternetAddress;
 import tango.util.Convert;
 
-import triton.common.asyncsocket;
-import triton.common.iomanager;
+import mordor.common.asyncsocket;
+import mordor.common.iomanager;
 
 void main(char[][] args)
 {

@@ -1,9 +1,9 @@
-module triton.common.iomanager;
+module mordor.common.iomanager;
 
 import tango.core.Thread;
 import tango.io.Stdout;
 
-public import triton.common.scheduler;
+public import mordor.common.scheduler;
 
 version(linux) {
     version = epoll;
