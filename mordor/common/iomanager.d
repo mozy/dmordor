@@ -284,7 +284,7 @@ version(Windows)
         {
             m_kqfd = kqueue();
             pipe(m_tickleFds);
-            Stdout.formatln("KQueue FD: {}, pipe fds: {} {}", m_kqfd, m_tickleFds[0], m_tickleFds[1]);
+            //Stdout.formatln("KQueue FD: {}, pipe fds: {} {}", m_kqfd, m_tickleFds[0], m_tickleFds[1]);
             struct_kevent event;
             EV_SET(event, m_tickleFds[0], EVFILT_READ, EV_ADD, 0, 0, null);
             kevent(m_kqfd, &event, 1, null, 0, null);
@@ -306,15 +306,15 @@ version(Windows)
         {
             struct_kevent[] events = new struct_kevent[64];
             while (true) {
-                Stdout.formatln("idling");
+                //Stdout.formatln("idling");
                 int rc = kevent(m_kqfd, null, 0, events.ptr, events.length, null);
-                Stdout.formatln("Got {} event(s)", rc);
+                //Stdout.formatln("Got {} event(s)", rc);
                 if (rc <= 0) {
                     throw new Exception("Fail!");
                 }
                 
                 foreach (event; events[0..rc]) {
-                    Stdout.formatln("Got events {} for fd {}", event.filter, event.ident);
+                    //Stdout.formatln("Got events {} for fd {}", event.filter, event.ident);
                     if (event.ident == m_tickleFds[0]) {
                         ubyte dummy;
                         read(m_tickleFds[0], &dummy, 1);
