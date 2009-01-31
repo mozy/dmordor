@@ -11,7 +11,7 @@ git clone ssh://icarus.dechocorp.com/var/lib/git/mordor.git mordor
 hg clone http://hg.dsource.org/projects/ldc ldc
 svn co http://svn.dsource.org/projects/tango/trunk ldc/tango
 cd ldc/tango
-patch -p0 < ../../mordor/patches/tango/*
+for $F in ../../mordor/patches/tango/*; do patch -p0 < $F; done
 cd ..
 ccmake ./
 <press c>
