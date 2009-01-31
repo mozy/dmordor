@@ -7,7 +7,7 @@ sudo port install cmake
 
 Pick your source directory, go there
 
-git clone svn://icarus.dechocorp.com/var/lib/git/mordor.git mordor
+git clone ssh://icarus.dechocorp.com/var/lib/git/mordor.git mordor
 hg clone http://hg.dsource.org/projects/ldc ldc
 svn co http://svn.dsource.org/projects/tango/trunk ldc/tango
 cd ldc/tango
