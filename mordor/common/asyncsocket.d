@@ -86,17 +86,18 @@ version (Windows) {
     class AsyncSocket : Socket
     {
     public:
-        this(AddressFamily family, SocketType type, ProtocolType protocol)
+        this(IOManager mgr, AddressFamily family, SocketType type, ProtocolType protocol)
         {
+            _ioManager = mgr;
             super(family, type, protocol);
-            g_ioManager.registerFile(cast(HANDLE)sock);
+            _ioManager.registerFile(cast(HANDLE)sock);
         }
 
         override Socket connect(Address to)
         {
             // Need to be bound, even to ADDR_ANY, before calling ConnectEx
             bind(newFamilyObject());
-            g_ioManager.registerEvent(&m_writeEvent);
+            _ioManager.registerEvent(&m_writeEvent);
             if (!ConnectEx(sock, cast(SOCKADDR*)to.name(), to.nameLen(), NULL, 0, NULL, &m_writeEvent.overlapped)) {
                 if (GetLastError() != WSA_IO_PENDING) {
                     exception("Unable to connect socket: ");
@@ -117,7 +118,7 @@ version (Windows) {
 
         override Socket accept (Socket target)
         {
-            g_ioManager.registerEvent(&m_readEvent);
+            _ioManager.registerEvent(&m_readEvent);
             void[] addrs = new void[64];
             DWORD bytes;
             BOOL ret = AcceptEx(sock, target.sock, addrs.ptr, addrs.length, (addrs.length - 16) / 2, (addrs.length - 16) / 2, &bytes,
@@ -142,7 +143,7 @@ version (Windows) {
             WSABUF wsabuf;
             wsabuf.buf = cast(char*)buf.ptr;
             wsabuf.len = buf.length;
-            g_ioManager.registerEvent(&m_writeEvent);
+            _ioManager.registerEvent(&m_writeEvent);
             int ret = WSASend(sock, &wsabuf, 1, NULL, cast(DWORD)flags,
                 &m_writeEvent.overlapped, NULL);
             if (ret && GetLastError() != WSA_IO_PENDING) {
@@ -163,7 +164,7 @@ version (Windows) {
                 wsabufs[i].buf = cast(char*)buf.ptr;
                 wsabufs[i].len = buf.length;
             }
-            g_ioManager.registerEvent(&m_writeEvent);
+            _ioManager.registerEvent(&m_writeEvent);
             int ret = WSASend(sock, wsabufs.ptr, wsabufs.length, NULL,
                 cast(DWORD)flags, &m_writeEvent.overlapped, NULL);
             if (ret && GetLastError() != WSA_IO_PENDING) {
@@ -182,7 +183,7 @@ version (Windows) {
             WSABUF wsabuf;
             wsabuf.buf = cast(char*)buf.ptr;
             wsabuf.len = buf.length;
-            g_ioManager.registerEvent(&m_writeEvent);
+            _ioManager.registerEvent(&m_writeEvent);
             int ret = WSASendTo(sock, &wsabuf, 1, NULL, cast(DWORD)flags,
                 cast(SOCKADDR*)to.name(), to.nameLen(),
                 &m_writeEvent.overlapped, NULL);
@@ -204,7 +205,7 @@ version (Windows) {
                 wsabufs[i].buf = cast(char*)buf.ptr;
                 wsabufs[i].len = buf.length;
             }
-            g_ioManager.registerEvent(&m_writeEvent);
+            _ioManager.registerEvent(&m_writeEvent);
             int ret = WSASendTo(sock, wsabufs.ptr, wsabufs.length, NULL,
                 cast(DWORD)flags, cast(SOCKADDR*)to.name(), to.nameLen(),
                 &m_writeEvent.overlapped, NULL);
@@ -231,7 +232,7 @@ version (Windows) {
                 wsabufs[i].buf = cast(char*)buf.ptr;
                 wsabufs[i].len = buf.length;
             }
-            g_ioManager.registerEvent(&m_writeEvent);
+            _ioManager.registerEvent(&m_writeEvent);
             int ret = WSASendTo(sock, wsabufs.ptr, wsabufs.length, NULL,
                 cast(DWORD)flags, NULL, 0,
                 &m_writeEvent.overlapped, NULL);
@@ -254,7 +255,7 @@ version (Windows) {
             WSABUF wsabuf;
             wsabuf.buf = cast(char*)buf.ptr;
             wsabuf.len = buf.length;
-            g_ioManager.registerEvent(&m_readEvent);
+            _ioManager.registerEvent(&m_readEvent);
             int ret = WSARecv(sock, &wsabuf, 1, NULL, cast(DWORD*)&flags,
                 &m_readEvent.overlapped, NULL);
             if (ret && GetLastError() != WSA_IO_PENDING) {
@@ -280,7 +281,7 @@ version (Windows) {
                 wsabufs[i].buf = cast(char*)buf.ptr;
                 wsabufs[i].len = buf.length;
             }
-            g_ioManager.registerEvent(&m_readEvent);
+            _ioManager.registerEvent(&m_readEvent);
             int ret = WSARecv(sock, wsabufs.ptr, wsabufs.length, NULL,
                 cast(DWORD*)&flags, &m_readEvent.overlapped, NULL);
             if (ret && GetLastError() != WSA_IO_PENDING) {
@@ -303,7 +304,7 @@ version (Windows) {
             wsabuf.buf = cast(char*)buf.ptr;
             wsabuf.len = buf.length;
             int nameLen = from.nameLen();
-            g_ioManager.registerEvent(&m_readEvent);
+            _ioManager.registerEvent(&m_readEvent);
             int ret = WSARecvFrom(sock, &wsabuf, 1, NULL, cast(DWORD*)&flags,
                 cast(SOCKADDR*)from.name(), &nameLen,
                 &m_readEvent.overlapped, NULL);
@@ -331,7 +332,7 @@ version (Windows) {
                 wsabufs[i].len = buf.length;
             }
             int nameLen = from.nameLen();
-            g_ioManager.registerEvent(&m_readEvent);
+            _ioManager.registerEvent(&m_readEvent);
             int ret = WSARecvFrom(sock, wsabufs.ptr, wsabufs.length, NULL,
                 cast(DWORD*)&flags, cast(SOCKADDR*)from.name(), &nameLen,
                 &m_readEvent.overlapped, NULL);
@@ -363,7 +364,7 @@ version (Windows) {
                 wsabufs[i].buf = cast(char*)buf.ptr;
                 wsabufs[i].len = buf.length;
             }
-            g_ioManager.registerEvent(&m_readEvent);
+            _ioManager.registerEvent(&m_readEvent);
             int ret = WSARecvFrom(sock, wsabufs.ptr, wsabufs.length, NULL,
                 cast(DWORD*)&flags, NULL, NULL,
                 &m_readEvent.overlapped, NULL);
@@ -379,6 +380,7 @@ version (Windows) {
         }
 
     private:
+        IOManager _ioManager;
         AsyncEvent m_readEvent;
         AsyncEvent m_writeEvent;
     }
@@ -409,8 +411,9 @@ version (Windows) {
     class AsyncSocket : Socket
     {
     public:
-        this(AddressFamily family, SocketType type, ProtocolType protocol, bool create=true)
+        this(IOManager mgr, AddressFamily family, SocketType type, ProtocolType protocol, bool create=true)
         {
+            _ioManager = mgr;
             version (epoll) {
                 m_readEvent.event.events = EPOLLIN;
                 m_writeEvent.event.events = EPOLLOUT;
@@ -455,7 +458,7 @@ version (Windows) {
         {
             super.connect(to);
             if (errno == EINPROGRESS) {
-                g_ioManager.registerEvent(&m_writeEvent);
+                _ioManager.registerEvent(&m_writeEvent);
                 Fiber.yield();
                 int err;
                 getOption(SocketOptionLevel.SOCKET, SocketOption.SO_ERROR, (cast(void*)&err)[0..int.sizeof]);
@@ -469,14 +472,14 @@ version (Windows) {
 
         override Socket accept()
         {
-            return accept(new AsyncSocket(family, type, protocol, false));
+            return accept(new AsyncSocket(_ioManager, family, type, protocol, false));
         }
 
         override Socket accept (Socket target)
         {
             socket_t newsock = .accept(sock, null, null);
             while (newsock == socket_t.init && errno == EAGAIN) {
-                g_ioManager.registerEvent(&m_readEvent);
+                _ioManager.registerEvent(&m_readEvent);
                 Fiber.yield();
                 newsock = .accept(sock, null, null);
             }
@@ -497,7 +500,7 @@ version (Windows) {
         {
             int rc = super.send(buf, flags);
             while (rc == ERROR && errno == EAGAIN) {
-                g_ioManager.registerEvent(&m_writeEvent);
+                _ioManager.registerEvent(&m_writeEvent);
                 Fiber.yield();
                 rc = super.send(buf, flags);
             }
@@ -516,7 +519,7 @@ version (Windows) {
             msg.msg_iovlen = iovs.length;
             int rc = sendmsg(sock, &msg, cast(int)flags);
             while (rc == ERROR && errno == EAGAIN) {
-                g_ioManager.registerEvent(&m_writeEvent);
+                _ioManager.registerEvent(&m_writeEvent);
                 Fiber.yield();
                 rc = sendmsg(sock, &msg, cast(int)flags);
             }
@@ -527,7 +530,7 @@ version (Windows) {
         {
             int rc = super.sendTo(buf, flags, to);
             while (rc == ERROR && errno == EAGAIN) {
-                g_ioManager.registerEvent(&m_writeEvent);
+                _ioManager.registerEvent(&m_writeEvent);
                 Fiber.yield();
                 rc = super.send(buf, flags);
             }
@@ -548,7 +551,7 @@ version (Windows) {
             msg.msg_iovlen = iovs.length;
             int rc = sendmsg(sock, &msg, cast(int)flags);
             while (rc == ERROR && errno == EAGAIN) {
-                g_ioManager.registerEvent(&m_writeEvent);
+                _ioManager.registerEvent(&m_writeEvent);
                 Fiber.yield();
                 rc = sendmsg(sock, &msg, cast(int)flags);
             }
@@ -569,7 +572,7 @@ version (Windows) {
         {
             int rc = super.receive(buf, flags);
             while (rc == ERROR && errno == EAGAIN) {
-                g_ioManager.registerEvent(&m_readEvent);
+                _ioManager.registerEvent(&m_readEvent);
                 Fiber.yield();
                 rc = super.receive(buf, flags);
             }
@@ -593,7 +596,7 @@ version (Windows) {
             msg.msg_iovlen = iovs.length;
             int rc = recvmsg(sock, &msg, cast(int)flags);
             while (rc == ERROR && errno == EAGAIN) {
-                g_ioManager.registerEvent(&m_readEvent);
+                _ioManager.registerEvent(&m_readEvent);
                 Fiber.yield();
                 rc = recvmsg(sock, &msg, cast(int)flags);
             }
@@ -604,7 +607,7 @@ version (Windows) {
         {
             int rc = super.receiveFrom(buf, flags, from);
             while (rc == ERROR && errno == EAGAIN) {
-                g_ioManager.registerEvent(&m_readEvent);
+                _ioManager.registerEvent(&m_readEvent);
                 Fiber.yield();
                 rc = super.receiveFrom(buf, flags, from);
             }
@@ -630,7 +633,7 @@ version (Windows) {
             msg.msg_iovlen = iovs.length;
             int rc = recvmsg(sock, &msg, cast(int)flags);
             while (rc == ERROR && errno == EAGAIN) {
-                g_ioManager.registerEvent(&m_readEvent);
+                _ioManager.registerEvent(&m_readEvent);
                 Fiber.yield();
                 rc = recvmsg(sock, &msg, cast(int)flags);
             }
@@ -648,6 +651,7 @@ version (Windows) {
         }
 
     private:
+        IOManager _ioManager;
         AsyncEvent m_readEvent;
         AsyncEvent m_writeEvent;
     }

@@ -350,5 +350,3 @@ version(Windows)
         struct_kevent event;
     };
 }
-
-IOManager g_ioManager;
