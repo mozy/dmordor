@@ -108,7 +108,7 @@ public:
         synchronized (Config.classinfo) {
             assert ((name in _vars) is null);
             ConfigVar!(T) var = new ConfigVar!(T)(name,
-                defaultValue, description, dynaimc, automatic);
+                defaultValue, description, dynamic, automatic);
             _vars[name] = var;
             return var;
         }
