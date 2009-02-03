@@ -1,6 +1,5 @@
 module mordor.common.config;
 
-import tango.core.Atomic;
 import tango.util.Convert;
 
 import mordor.common.stringutils;
@@ -53,15 +52,15 @@ public:
     string toString() { return to!(string)(val); }
     
     static if(is(T : string)) {
-        /* invariant */ T val() { return atomicLoad(_val).val; }
-        void val(string v) { atomicStore(_val, new Box(v)); }
+        /* invariant */ T val() { volatile return _val.val; }
+        void val(string v) { volatile _val = new Box(v); }
     } else static if (T.sizeof > size_t.sizeof) {
-        /* invariant */ T val() { return atomicLoad(_val).val; }
-        void val(/* invariant */ T v) { atomicStore(_val, new Box(v)); }
+        /* invariant */ T val() { volatile return _val.val; }
+        void val(/* invariant */ T v) { volatile _val = new Box(v); }
         void val(string v) { val = to!(T)(v); }
     } else {
-        /* invariant */ T val() { return atomicLoad(_val); }
-        void val(/* invariant */ T v) { atomicStore(_val, v); }
+        /* invariant */ T val() { volatile return _val; }
+        void val(/* invariant */ T v) { volatile _val = v; }
         void val(string v) { val = to!(T)(v); }
     }
 
