@@ -42,45 +42,42 @@ public:
         super(name, description, dynamic, automatic);
         val = defaultValue;
     }
-    this(string name, string defaultValue, string description,
-        bool dynamic = true, bool automatic = false)
-    {
-        super(name, description, dynamic, automatic);
-        val = defaultValue;
+    static if (!is(T : string)) {
+        this(string name, string defaultValue, string description,
+            bool dynamic = true, bool automatic = false)
+        {
+            super(name, description, dynamic, automatic);
+            val = defaultValue;
+        }
     }
-    string toString() { return to!(string)(_val); }
-
-    /* invariant */ T val() { return atomicLoad(_val); }
-    void val(/* invariant */ T v) { atomicStore(_val, v); }
-    void val(string v) { val = to!(T)(v); }
+    string toString() { return to!(string)(val); }
+    
+    static if(is(T : string)) {
+        /* invariant */ T val() { return atomicLoad(_val).val; }
+        void val(string v) { atomicStore(_val, new Box(v)); }
+    } else static if (T.sizeof > size_t.sizeof) {
+        /* invariant */ T val() { return atomicLoad(_val).val; }
+        void val(/* invariant */ T v) { atomicStore(_val, new Box(v)); }
+        void val(string v) { val = to!(T)(v); }
+    } else {
+        /* invariant */ T val() { return atomicLoad(_val); }
+        void val(/* invariant */ T v) { atomicStore(_val, v); }
+        void val(string v) { val = to!(T)(v); }
+    }
 
 private:
-    T _val;
+    static if (T.sizeof > size_t.sizeof) {
+        class Box {
+        public:
+            this(T v) { val = v; }
+            T val;
+        }
+        Box _val;
+    } else {
+        T _val;
+    }
 }
 
-class ConfigVar(T : string) : public ConfigVarBase
-{
-public:
-    this(string name, /* invariant */ string defaultValue,
-        string description,
-        bool dynamic = true, bool automatic = false)
-    {
-        super(name, description, dynamic, automatic);
-        val = defaultValue;
-    }
-    string toString() { return val; }
-
-    /* invariant */ string val() { return atomicLoad(_val).val; }
-    void val(/* invariant */ string v) { atomicStore(_val, new Container(v)); }
-
-private:
-    class Container {
-    public:
-        this(string v) { val = v; }
-        string val;
-    }
-    Container _val;
-}
 
 class Config
 {
@@ -108,7 +105,7 @@ public:
         }
     }
 
-    static synchronized ConfigVar!(T) lookup(T)(string name,
+    static ConfigVar!(T) lookup(T)(string name,
         string defaultValue, string description,
         bool dynamic = true, bool automatic = false)
     {
