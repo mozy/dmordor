@@ -24,6 +24,8 @@ version (Windows) {
     const LPFN_ACCEPTEX AcceptEx;
     const LPFN_CONNECTEX ConnectEx;
 
+    alias WSABUF sgbuf;
+
     extern (Windows) {
         private BOOL AcceptExNotImpl(
             SOCKET sListenSocket,
@@ -89,7 +91,11 @@ version (Windows) {
     struct iovec {
         void*  iov_base;
         size_t iov_len;
+
+        alias iov_base buf;
+        alias iov_len len;
     }
+    alias iovec sgbuf;
 
     struct msghdr {
          void*         msg_name;
@@ -536,30 +542,14 @@ public:
     }
     
 protected:
-    // native scatter/gather array
-    version (Windows) {
-        alias WSABUF[] sgarray;
-    } else version (Posix) {
-        alias iovec[] sgarray;
-    }
-    
-    sgarray makeSGArray(void[][] bufs)
+    sgbuf[] makeSGArray(void[][] bufs)
     {
-        version (Windows) {
-            WSABUF[] wsabufs = new WSABUF[bufs.length];
-            foreach (i, buf; bufs) {
-                wsabufs[i].buf = cast(char*)buf.ptr;
-                wsabufs[i].len = buf.length;
-            }
-            return wsabufs;
-        } else version (Posix) {
-            iovec[] iovs = new iovec[bufs.length];
-            foreach (i, buf; bufs) {
-                iovs[i].iov_base = buf.ptr;
-                iovs[i].iov_len = buf.length;
-            }
-            return iovs;
+        auto array = new sgbuf[bufs.length];
+        foreach (i, buf; bufs) {
+            array[i].buf = cast(char*)buf.ptr;
+            array[i].len = buf.length;
         }
+        return array;
     }
     
     
