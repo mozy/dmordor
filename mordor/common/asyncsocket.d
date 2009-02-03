@@ -110,10 +110,14 @@ version (Windows) {
 class AsyncSocket : Socket
 {
 public:
-    this(IOManager mgr, AddressFamily family, SocketType type, ProtocolType protocol)
+    this(IOManager mgr, AddressFamily family, SocketType type, ProtocolType protocol, bool create = true)
     {
+        version (Windows) {
+            // Must always create the socket on Windows
+            create = true;
+        }
         _ioManager = mgr;
-        super(family, type, protocol);
+        super(family, type, protocol, create);
         version (Windows) {
             _ioManager.registerFile(cast(HANDLE)sock);
         } else version (epoll) {
