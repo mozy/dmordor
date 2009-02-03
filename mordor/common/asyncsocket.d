@@ -279,11 +279,7 @@ public:
     int send(void[][] bufs, SocketFlags flags=SocketFlags.NONE)
     {
         version (Windows) {
-            WSABUF[] wsabufs = new WSABUF[bufs.length];
-            foreach (i, buf; bufs) {
-                wsabufs[i].buf = cast(char*)buf.ptr;
-                wsabufs[i].len = buf.length;
-            }
+            WSABUF[] wsabufs = makeSGArray(bufs);
             _ioManager.registerEvent(&m_writeEvent);
             int ret = WSASend(sock, wsabufs.ptr, wsabufs.length, NULL,
                 cast(DWORD)flags, &m_writeEvent.overlapped, NULL);
@@ -298,11 +294,7 @@ public:
             return m_writeEvent.numberOfBytes;
         } else version (Posix) {
             msghdr msg;
-            iovec[] iovs = new iovec[bufs.length];
-            foreach (i, buf; bufs) {
-                iovs[i].iov_base = buf.ptr;
-                iovs[i].iov_len = buf.length;
-            }
+            iovec[] iovs = makeSGArray(bufs);
             msg.msg_iov = iovs.ptr;
             msg.msg_iovlen = iovs.length;
             int rc = sendmsg(sock, &msg, cast(int)flags);
@@ -348,11 +340,7 @@ public:
     int sendTo(void[][] bufs, SocketFlags flags, Address to)
     {
         version (Windows) {
-            WSABUF[] wsabufs = new WSABUF[bufs.length];
-            foreach (i, buf; bufs) {
-                wsabufs[i].buf = cast(char*)buf.ptr;
-                wsabufs[i].len = buf.length;
-            }
+            WSABUF[] wsabufs = makeSGArray(bufs);
             _ioManager.registerEvent(&m_writeEvent);
             int ret = WSASendTo(sock, wsabufs.ptr, wsabufs.length, NULL,
                 cast(DWORD)flags, cast(SOCKADDR*)to.name(), to.nameLen(),
@@ -370,11 +358,7 @@ public:
             msghdr msg;
             msg.msg_name = to.name();
             msg.msg_namelen = to.nameLen();
-            iovec[] iovs = new iovec[bufs.length];
-            foreach (i, buf; bufs) {
-                iovs[i].iov_base = buf.ptr;
-                iovs[i].iov_len = buf.length;
-            }
+            iovec[] iovs = makeSGArray(bufs);
             msg.msg_iov = iovs.ptr;
             msg.msg_iovlen = iovs.length;
             int rc = sendmsg(sock, &msg, cast(int)flags);
@@ -435,13 +419,7 @@ public:
             if (!bufs.length)
                 badArg ("Socket.receive :: target buffer has 0 length");
 
-            WSABUF[] wsabufs = new WSABUF[bufs.length];
-            foreach (i, buf; bufs) {
-                if (!buf.length)
-                    badArg ("Socket.receive :: target buffer has 0 length");
-                wsabufs[i].buf = cast(char*)buf.ptr;
-                wsabufs[i].len = buf.length;
-            }
+            WSABUF[] wsabufs = makeSGArray(bufs);
             _ioManager.registerEvent(&m_readEvent);
             int ret = WSARecv(sock, wsabufs.ptr, wsabufs.length, NULL,
                 cast(DWORD*)&flags, &m_readEvent.overlapped, NULL);
@@ -459,13 +437,7 @@ public:
                 badArg ("Socket.receive :: target buffer has 0 length");
 
             msghdr msg;
-            iovec[] iovs = new iovec[bufs.length];
-            foreach (i, buf; bufs) {
-                if (!buf.length)
-                    badArg ("Socket.receive :: target buffer has 0 length");
-                iovs[i].iov_base = buf.ptr;
-                iovs[i].iov_len = buf.length;
-            }
+            iovec[] iovs = makeSGArray(bufs);
             msg.msg_iov = iovs.ptr;
             msg.msg_iovlen = iovs.length;
             int rc = recvmsg(sock, &msg, cast(int)flags);
@@ -518,13 +490,7 @@ public:
             if (!bufs.length)
                 badArg ("Socket.receiveFrom :: target buffer has 0 length");
 
-            WSABUF[] wsabufs = new WSABUF[bufs.length];
-            foreach (i, buf; bufs) {
-                if (!buf.length)
-                    badArg ("Socket.receiveFrom :: target buffer has 0 length");
-                wsabufs[i].buf = cast(char*)buf.ptr;
-                wsabufs[i].len = buf.length;
-            }
+            WSABUF[] wsabufs = makeSGArray(bufs);
             int nameLen = from.nameLen();
             _ioManager.registerEvent(&m_readEvent);
             int ret = WSARecvFrom(sock, wsabufs.ptr, wsabufs.length, NULL,
@@ -546,13 +512,7 @@ public:
             msghdr msg;
             msg.msg_name = from.name();
             msg.msg_namelen = from.nameLen();
-            iovec[] iovs = new iovec[bufs.length];
-            foreach (i, buf; bufs) {
-                if (!buf.length)
-                    badArg ("Socket.receive :: target buffer has 0 length");
-                iovs[i].iov_base = buf.ptr;
-                iovs[i].iov_len = buf.length;
-            }
+            iovec[] iovs = makeSGArray(bufs);
             msg.msg_iov = iovs.ptr;
             msg.msg_iovlen = iovs.length;
             int rc = recvmsg(sock, &msg, cast(int)flags);
@@ -574,6 +534,36 @@ public:
     {
         return receive(bufs, flags);
     }
+    
+protected:
+    // native scatter/gather array
+    version (Windows) {
+        alias WSABUF[] sgarray;
+    } else version (Posix) {
+        alias iovec[] sgarray;
+    }
+    
+    sgarray makeSGArray(void[][] bufs)
+    {
+        version (Windows) {
+            WSABUF[] wsabufs = new WSABUF[bufs.length];
+            foreach (i, buf; bufs) {
+                wsabufs[i].buf = cast(char*)buf.ptr;
+                wsabufs[i].len = buf.length;
+            }
+            return wsabufs;
+        } else version (Posix) {
+            iovec[] iovs = new iovec[bufs.length];
+            foreach (i, buf; bufs) {
+                iovs[i].iov_base = buf.ptr;
+                iovs[i].iov_len = buf.length;
+            }
+            return iovs;
+        }
+    }
+    
+    
+    
 
 private:
     IOManager _ioManager;
