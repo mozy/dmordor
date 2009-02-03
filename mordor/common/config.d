@@ -93,14 +93,11 @@ public:
         bool dynamic = true, bool automatic = false)
     {
         synchronized (Config.classinfo) {
-            ConfigVar!(T)* pvar = cast(ConfigVar!(T)*)(name in _vars);
-            if (pvar is null) {
-                ConfigVar!(T) var = new ConfigVar!(T)(name,
-                    defaultValue, description, dynamic, automatic);
-                _vars[name] = var;
-                return var;
-            }
-            return *pvar;
+            assert ((name in _vars) is null);
+            ConfigVar!(T) var = new ConfigVar!(T)(name,
+                defaultValue, description, dynamic, automatic);
+            _vars[name] = var;
+            return var;
         }
     }
 
@@ -109,14 +106,11 @@ public:
         bool dynamic = true, bool automatic = false)
     {
         synchronized (Config.classinfo) {
-            ConfigVar!(T)* pvar = cast(ConfigVar!(T)*)(name in _vars);
-            if (var is null) {
-                ConfigVar!(T) var = new ConfigVar!(T)(name,
-                    defaultValue, description, dynaimc, automatic);
-                _vars[name] = var;
-                return var;
-            }
-            return *pvar;
+            assert ((name in _vars) is null);
+            ConfigVar!(T) var = new ConfigVar!(T)(name,
+                defaultValue, description, dynaimc, automatic);
+            _vars[name] = var;
+            return var;
         }
     }
     
