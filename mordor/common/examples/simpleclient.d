@@ -10,10 +10,10 @@ import mordor.common.iomanager;
 
 void main(char[][] args)
 {
-    g_ioManager = new IOManager();
+    IOManager ioManager = new IOManager();
 
-    g_ioManager.schedule(new Fiber(delegate void() {
-        Socket s = new AsyncSocket(AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
+    ioManager.schedule(new Fiber(delegate void() {
+        Socket s = new AsyncSocket(ioManager, AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
         s.connect(new InternetAddress(args[1], to!(int)(args[2])));
         int rc = s.send("hello\r\n");
         if (rc <= 0) {
@@ -30,5 +30,5 @@ void main(char[][] args)
         s.detach();
     }));
 
-    g_ioManager.start(true);
+    ioManager.start(true);
 }

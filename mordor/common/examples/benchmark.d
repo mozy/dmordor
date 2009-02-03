@@ -12,6 +12,8 @@ import mordor.common.iomanager;
 
 const int SERVER_PORT = 60000;
 
+IOManager g_ioManager;
+
 void main(char[][] args)
 {
     g_ioManager = new IOManager();
@@ -21,7 +23,7 @@ void main(char[][] args)
 
     if (runServer) {
         g_ioManager.schedule(new Fiber(delegate void() {
-            Socket s = new AsyncSocket(AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
+            Socket s = new AsyncSocket(g_ioManager, AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
             s.bind(new InternetAddress("0.0.0.0", SERVER_PORT));
             s.listen(10);
 
@@ -99,7 +101,7 @@ public:
 
     static void run()
     {
-        Socket s = new AsyncSocket(AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
+        Socket s = new AsyncSocket(g_ioManager, AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
         s.connect(new InternetAddress("127.0.0.1", SERVER_PORT));
 
         if (atomicIncrement(g_connected) == g_numNew) {

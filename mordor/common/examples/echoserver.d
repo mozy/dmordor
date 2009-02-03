@@ -9,12 +9,21 @@ import mordor.common.iomanager;
 
 void main(char[][])
 {
-    g_ioManager = new IOManager(5);
+    IOManager ioManager = new IOManager(5);
 
-    Fiber f = new Fiber(&fiberMain);
-    g_ioManager.schedule(f);
+    ioManager.schedule(new Fiber(delegate void() {
+        Socket s = new AsyncSocket(ioManager, AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
+        s.bind(new InternetAddress("127.0.0.1", 8000));
+        s.listen(10);
 
-    g_ioManager.start(true);
+        while(true) {
+            Socket newsocket = s.accept();
+            Connection newconn = new Connection(newsocket);
+            Scheduler.autoschedule(new Fiber(&newconn.run));
+        }
+    }));
+
+    ioManager.start(true);
 }
 
 class Connection
@@ -46,16 +55,3 @@ public:
 private:
     Socket sock;
 };
-
-void fiberMain()
-{
-    Socket s = new AsyncSocket(AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
-    s.bind(new InternetAddress("127.0.0.1", 8000));
-    s.listen(10);
-
-    while(true) {
-        Socket newsocket = s.accept();
-        Connection newconn = new Connection(newsocket);
-        Scheduler.autoschedule(new Fiber(&newconn.run));
-    }
-}
