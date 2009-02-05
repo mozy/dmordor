@@ -28,6 +28,7 @@ void main(char[][] args)
 
         s.shutdown(SocketShutdown.BOTH);
         s.detach();
+        ioManager.stop();
     }));
 
     ioManager.start(true);

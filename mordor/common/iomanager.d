@@ -51,6 +51,13 @@ version(Windows)
             ULONG_PTR completionKey;
             OVERLAPPED* overlapped;
             while (true) {
+                if (stopping) {
+                    synchronized (this) {
+                        if (m_pendingEvents.length == 0) {
+                            return;
+                        }
+                    }
+                }
                 //Stdout.formatln("in idle");
                 BOOL ret = GetQueuedCompletionStatus(m_hCompletionPort,
                     &numberOfBytes, &completionKey, &overlapped, INFINITE);
@@ -162,6 +169,13 @@ version(Windows)
         {
             epoll_event[] events = new epoll_event[64];
             while (true) {
+                if (stopping) {
+                    synchronized (this) {
+                        if (m_pendingEvents.length == 0) {
+                            return;
+                        }
+                    }
+                }
                 //Stdout.formatln("idling");
                 int rc = epoll_wait(m_epfd, events.ptr, events.length, -1);
                 //Stdout.formatln("Got {} event(s)", rc);
@@ -306,6 +320,10 @@ version(Windows)
         {
             struct_kevent[] events = new struct_kevent[64];
             while (true) {
+                if (stopping) {
+                    // TODO: dunno if we have pending events
+                    return;
+                }
                 //Stdout.formatln("idling");
                 int rc = kevent(m_kqfd, null, 0, events.ptr, events.length, null);
                 //Stdout.formatln("Got {} event(s)", rc);

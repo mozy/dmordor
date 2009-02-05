@@ -93,7 +93,19 @@ public:
 
     void start(bool useCaller = false)
     {
+        atomicStore(_stopping, false);
         m_threads.start(useCaller);
+    }
+    
+    void stop()
+    {
+        atomicStore(_stopping, true);
+        tickle();
+    }
+    
+    bool stopping()
+    {
+        return atomicLoad(_stopping);
     }
 
     void
@@ -164,6 +176,7 @@ private:
     static ThreadLocal!(Scheduler) t_scheduler;
     ThreadPool                     m_threads;
     CircularList!(Fiber)           m_fibers;
+    bool                           _stopping;
 }
 
 class WorkerPool : Scheduler
@@ -173,25 +186,16 @@ public:
     {
         m_mutex = new Mutex();
         m_cond = new Condition(m_mutex);
-        m_terminate = false;
         super(name, threads);
-    }
-    void stop()
-    {
-        synchronized (m_mutex) {
-            m_cond.notifyAll();
-            m_terminate = true;
-        }
     }
 
 protected:
     void idle()
     {
         while (true) {
+            if (stopping)
+                return;
             synchronized (m_mutex) {
-                if (m_terminate) {
-                    return;
-                }
                 m_cond.wait();
             }
             Fiber.yield();
@@ -207,7 +211,6 @@ protected:
 private:
     Mutex m_mutex;
     Condition m_cond;
-    bool m_terminate;
 }
 
 /*

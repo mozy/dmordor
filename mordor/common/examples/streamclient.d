@@ -29,6 +29,7 @@ void main(char[][] args)
             return;
         }
         Stdout.formatln("Read {} bytes from conn", result);
+        ioManager.stop();
     }));
 
     ioManager.start(true);
