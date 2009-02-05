@@ -2,17 +2,23 @@ module mordor.common.streams.stream;
 
 public import mordor.common.streams.buffer;
 
-typedef int result_t;
+alias int result_t;
 
 class Stream
 {
 public:
+    enum CloseType {
+        READ,
+        WRITE,
+        BOTH
+    }
+
     enum Anchor {
         BEGIN,
         CURRENT,
         END
     }
-    
+
     ~this() { close(); }
 
     bool supportsRead() { return false; }
@@ -22,8 +28,8 @@ public:
     bool supportsTruncate() { return false; }
     bool supportsEof() { return supportsSeek() && supportsSize(); }
     
-    result_t close() { return 0; }
-    result_t read(ref Buffer b, size_t len) { assert(false); return -1; }
+    result_t close(CloseType type = CloseType.BOTH) { return 0; }
+    result_t read(Buffer b, size_t len) { assert(false); return -1; }
     result_t write(Buffer b, size_t len) { assert(false); return -1; }
     result_t seek(long offset, Anchor anchor, ref long size) { assert(false); return -1; }
     result_t size(ref long size) { assert(false); return -1; }

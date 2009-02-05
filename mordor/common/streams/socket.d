@@ -17,16 +17,33 @@ public:
     bool supportsWrite() { return true; }
     bool supportsEof() { return true; }
 
-    result_t close()
-    {
+    result_t close(CloseType type)
+    {        
         if (_s !is null && _own) {
-            _s.detach();
-            _s = null;
+            SocketShutdown socketShutdown;
+            switch (type) {
+                case CloseType.READ:
+                    socketShutdown = SocketShutdown.RECEIVE;
+                    break;
+                case CloseType.WRITE:
+                    socketShutdown = SocketShutdown.SEND;
+                    break;
+                default:
+                    socketShutdown = SocketShutdown.BOTH;
+                    break;
+            }
+            if (socketShutdown == SocketShutdown.BOTH) {
+                _s.shutdown(socketShutdown);
+                _s.detach();
+                _s = null;
+            } else {
+                _s.shutdown(socketShutdown);
+            }
         }
         return 0;
     }
 
-    result_t read(ref Buffer b, size_t len)
+    result_t read(Buffer b, size_t len)
     {
         int rc = _s.receive(b.writeBuf(len));
         if (rc == 0) {
@@ -35,12 +52,12 @@ public:
         if (rc > 0) {
             b.produce(rc);
         }
-        return cast(result_t)rc;
+        return rc;
     }
 
     result_t write(Buffer b, size_t len)
     {
-        return cast(result_t)_s.send(b.readBuf(len));
+        return _s.send(b.readBuf(len));
     }
     
     result_t eof()
