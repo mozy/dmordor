@@ -64,8 +64,8 @@ class Buffer
     private:
         size_t _writeIndex;
         void[] _buf;
-        
-        invariant
+ 
+        invariant()
         {
             assert(_writeIndex <= _buf.length);
         }
@@ -74,7 +74,7 @@ class Buffer
 public:
     this()
     {
-        _bufs = new LinkedList!(Data, false)();
+        _bufs = new LinkedList!(Data)();
         _writeIt = _bufs.end;
     }
     
@@ -282,13 +282,12 @@ public:
     }
 
 private:
-    LinkedList!(Data, false) _bufs;
+    LinkedList!(Data) _bufs;
     size_t _readAvailable;
     size_t _writeAvailable;
     _bufs.Iterator _writeIt;
     
-public:
-    invariant
+    invariant()
     {
         size_t read = 0;
         size_t write = 0;
