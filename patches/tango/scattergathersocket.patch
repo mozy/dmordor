@@ -1,0 +1,297 @@
+diff --git tango/net/Socket.d tango/net/Socket.d
+index f16cfd7..8bb7597 100644
+--- tango/net/Socket.d
++++ tango/net/Socket.d
+@@ -131,6 +131,20 @@ version (Win32)
+         }
+         alias WSADATA* LPWSADATA;
+ 
++        struct WSABUF
++        {
++                       uint len;
++                       char* buf;
++                       alias buf iov_base;
++                       alias len iov_len;
++        }
++        alias WSABUF* LPWSABUF;
++        alias WSABUF iovec;
++
++        // We don't care about these types
++        alias void* LPWSAOVERLAPPED;
++        alias void* LPWSAOVERLAPPED_COMPLETION_ROUTINE;
++
+         extern  (Windows)
+                 {
+                 alias closesocket close;
+@@ -160,6 +174,10 @@ version (Win32)
+                 hostent* gethostbyname(char* name);
+                 hostent* gethostbyaddr(void* addr, int len, int type);
+                 int WSAGetLastError();
++                int WSASend(socket_t s, LPWSABUF lpBuffers, DWORD dwBufferCount, LPDWORD lpNumberOfBytesSent, DWORD dwFlags, LPWSAOVERLAPPED lpOverlapped, LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine);
++                int WSASendTo(socket_t s, LPWSABUF lpBuffers, DWORD dwBufferCount, LPDWORD lpNumberOfBytesSent, DWORD dwFlags, sockaddr* lpTo, int iToLen, LPWSAOVERLAPPED lpOverlapped, LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine);
++                int WSARecv(socket_t s, LPWSABUF lpBuffers, DWORD dwBufferCount, LPDWORD lpNumberOfBytesRecvd, LPDWORD lpFlags, LPWSAOVERLAPPED lpOverlapped, LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine);
++                int WSARecvFrom(socket_t s, LPWSABUF lpBuffers, DWORD dwBufferCount, LPDWORD lpNumberOfBytesRecvd, LPDWORD lpFlags, sockaddr* lpFrom, LPINT lpFromlen, LPWSAOVERLAPPED lpOverlapped, LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine);
+                 }
+ 
+         static this()
+@@ -180,6 +198,7 @@ version (Win32)
+ version (BsdSockets)
+         {
+         private import tango.stdc.errno;
++        private import tango.stdc.posix.sys.uio;
+ 
+         typedef int socket_t = -1;
+ 
+@@ -190,6 +209,17 @@ version (BsdSockets)
+            else
+                  private const int O_NONBLOCK = 04000;  // OCTAL! Thx to volcore
+ 
++       struct msghdr
++       {
++               void* msg_name;
++               int msg_namelen;
++               iovec* msg_iov;
++               int msg_iovlen;
++               void* msg_control;
++               int msg_controllen;
++               int msg_flags;
++       }
++
+         extern  (C)
+                 {
+                 socket_t socket(int af, int type, int protocol);
+@@ -214,6 +244,8 @@ version (BsdSockets)
+                 char* inet_ntoa(uint ina);
+                 hostent* gethostbyname(char* name);
+                 hostent* gethostbyaddr(void* addr, int len, int type);
++                int sendmsg(socket_t s, msghdr* message, int flags);
++                int recvmsg(socket_t s, msghdr* message, int flags);
+                 }
+         }
+ 
+@@ -1223,6 +1255,28 @@ class Socket
+                 return .send(sock, buf.ptr, buf.length, cast(int)flags);
+         }
+ 
++        /// ditto
++        int send(void[][] bufs, SocketFlags flags=SocketFlags.NONE)
++        {
++                iovec[] iov = makeIovec(bufs);
++                version(Win32)
++                {
++                        DWORD sent;
++                        if(SOCKET_ERROR == .WSASend(sock, iov.ptr, iov.length, &sent, cast(DWORD)flags, null, null)) {
++                                return SOCKET_ERROR;
++                        } else {
++                                return sent;
++                        }
++                }
++                else version(BsdSockets)
++                {
++                        msghdr msg;
++                        msg.msg_iov = iov.ptr;
++                        msg.msg_iovlen = iov.length;
++                        return .sendmsg(sock, &msg, cast(int)flags);
++                }
++        }
++
+         /**
+          * Send data to a specific destination Address. If the destination address is not specified, a connection must have been made and that address is used. If the socket is blocking and there is no buffer space left, sendTo waits.
+          */
+@@ -1232,11 +1286,41 @@ class Socket
+         }
+ 
+         /// ditto
++        int sendTo(void[][] bufs, SocketFlags flags, Address to)
++        {
++                iovec[] iov = makeIovec(bufs);
++                version(Win32)
++                {
++                        DWORD sent;
++                        if(SOCKET_ERROR == .WSASendTo(sock, iov.ptr, iov.length, &sent, cast(DWORD)flags, to.name(), to.nameLen(), null, null)) {
++                                return SOCKET_ERROR;
++                        } else {
++                                return sent;
++                        }
++                }
++                else version(BsdSockets)
++                {
++                        msghdr msg;
++                        msg.msg_name = to.name();
++                        msg.msg_namelen = to.nameLen();
++                        msg.msg_iov = iov.ptr;
++                        msg.msg_iovlen = iov.length;
++                        return .sendmsg(sock, &msg, cast(int)flags);
++                }
++        }
++
++        /// ditto
+         int sendTo(void[] buf, Address to)
+         {
+                 return sendTo(buf, SocketFlags.NONE, to);
+         }
+ 
++        /// ditto
++        int sendTo(void[][] bufs, Address to)
++        {
++                return sendTo(bufs, SocketFlags.NONE, to);
++        }
++
+ 
+         //assumes you connect()ed
+         /// ditto
+@@ -1245,6 +1329,28 @@ class Socket
+                 return .sendto(sock, buf.ptr, buf.length, cast(int)flags, null, 0);
+         }
+ 
++        /// ditto
++        int sendTo(void[][] bufs, SocketFlags flags=SocketFlags.NONE)
++        {
++                iovec[] iov = makeIovec(bufs);
++                version(Win32)
++                {
++                        DWORD sent;
++                        if(SOCKET_ERROR == .WSASendTo(sock, iov.ptr, iov.length, &sent, cast(DWORD)flags, null, 0, null, null)) {
++                                return SOCKET_ERROR;
++                        } else {
++                                return sent;
++                        }
++                }
++                else version(BsdSockets)
++                {
++                        msghdr msg;
++                        msg.msg_iov = iov.ptr;
++                        msg.msg_iovlen = iov.length;
++                        return .sendmsg(sock, &msg, cast(int)flags);
++                }
++        }
++
+ 
+         /**
+          * Receive data on the connection. Returns the number of bytes actually
+@@ -1261,6 +1367,28 @@ class Socket
+                 return .recv(sock, buf.ptr, buf.length, cast(int)flags);
+         }
+ 
++        /// ditto
++        int receive(void[][] bufs, SocketFlags flags=SocketFlags.NONE)
++        {
++                iovec[] iov = makeIovec(bufs);
++                version(Win32)
++                {
++                        DWORD recvd;
++                        if(SOCKET_ERROR == .WSARecv(sock, iov.ptr, iov.length, &recvd, cast(LPDWORD)&flags, null, null)) {
++                                return SOCKET_ERROR;
++                        } else {
++                                return recvd;
++                        }
++                }
++                else version(BsdSockets)
++                {
++                        msghdr msg;
++                        msg.msg_iov = iov.ptr;
++                        msg.msg_iovlen = iov.length;
++                        return .recvmsg(sock, &msg, cast(int)flags);
++                }
++        }
++
+         /**
+          * Receive data and get the remote endpoint Address. Returns the number of bytes actually received, 0 if the remote side has closed the connection, or ERROR on failure. If the socket is blocking, receiveFrom waits until there is data to be received.
+          */
+@@ -1274,6 +1402,31 @@ class Socket
+                 return .recvfrom(sock, buf.ptr, buf.length, cast(int)flags, from.name(), &nameLen);
+         }
+ 
++        /// ditto
++        int receiveFrom(void[][] bufs, SocketFlags flags, Address from)
++        {
++                iovec[] iov = makeIovec(bufs);
++                version(Win32)
++                {
++                        DWORD recvd;
++                        int nameLen = from.nameLen();
++                        if(SOCKET_ERROR == .WSARecvFrom(sock, iov.ptr, iov.length, &recvd, cast(LPDWORD)&flags, from.name(), &nameLen, null, null)) {
++                                return SOCKET_ERROR;
++                        } else {
++                                return recvd;
++                        }
++                }
++                else version(BsdSockets)
++                {
++                        msghdr msg;
++                        msg.msg_name = from.name();
++                        msg.msg_namelen = from.nameLen();
++                        msg.msg_iov = iov.ptr;
++                        msg.msg_iovlen = iov.length;
++                        return .recvmsg(sock, &msg, cast(int)flags);
++                }
++        }
++
+ 
+         /// ditto
+         int receiveFrom(void[] buf, Address from)
+@@ -1281,6 +1434,12 @@ class Socket
+                 return receiveFrom(buf, SocketFlags.NONE, from);
+         }
+ 
++        /// ditto
++        int receiveFrom(void[][] bufs, Address from)
++        {
++                return receiveFrom(bufs, SocketFlags.NONE, from);
++        }
++
+ 
+         //assumes you connect()ed
+         /// ditto
+@@ -1292,6 +1451,28 @@ class Socket
+                 return .recvfrom(sock, buf.ptr, buf.length, cast(int)flags, null, null);
+         }
+ 
++        /// ditto
++        int receiveFrom(void[][] bufs, SocketFlags flags=SocketFlags.NONE)
++        {
++                iovec[] iov = makeIovec(bufs);
++                version(Win32)
++                {
++                        DWORD recvd;
++                        if(SOCKET_ERROR == .WSARecvFrom(sock, iov.ptr, iov.length, &recvd, cast(LPDWORD)&flags, null, null, null, null)) {
++                                return SOCKET_ERROR;
++                        } else {
++                                return recvd;
++                        }
++                }
++                else version(BsdSockets)
++                {
++                        msghdr msg;
++                        msg.msg_iov = iov.ptr;
++                        msg.msg_iovlen = iov.length;
++                        return .recvmsg(sock, &msg, cast(int)flags);
++                }
++        }
++
+ 
+         /***********************************************************************
+ 
+@@ -1470,6 +1651,22 @@ class Socket
+                 tv.tv_usec = cast(uint) time.micros % 1_000_000;
+                 return tv;
+         }
++
++        /***********************************************************************
++
++                Convert a void[][] into a native scatter/gather array
++
++        ***********************************************************************/
++
++        protected static iovec[] makeIovec(void[][] bufs)
++        {
++            iovec[] array = new iovec[bufs.length];
++            foreach (i, buf; bufs) {
++                array[i].iov_base = cast(char*)buf.ptr;
++                array[i].iov_len = buf.length;
++            }
++            return array;
++        }
+ }
+ 
+ 

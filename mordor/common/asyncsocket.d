@@ -20,11 +20,15 @@ version (Windows) {
     import win32.winbase;
     import win32.windef;
     import win32.winsock2;
+    
+    alias win32.winsock2.WSABUF WSABUF;
+    alias win32.winsock2.WSASend WSASend;
+    alias win32.winsock2.WSASendTo WSASendTo;
+    alias win32.winsock2.WSARecv WSARecv;
+    alias win32.winsock2.WSARecvFrom WSARecvFrom;
 
     const LPFN_ACCEPTEX AcceptEx;
     const LPFN_CONNECTEX ConnectEx;
-
-    alias WSABUF sgbuf;
 
     extern (Windows) {
         private BOOL AcceptExNotImpl(
@@ -87,30 +91,6 @@ version (Windows) {
 } else version (Posix) {
     import tango.stdc.errno;
     version (epoll) import tango.sys.linux.epoll;
-
-    struct iovec {
-        void*  iov_base;
-        size_t iov_len;
-
-        alias iov_base buf;
-        alias iov_len len;
-    }
-    alias iovec sgbuf;
-
-    struct msghdr {
-         void*         msg_name;
-         int           msg_namelen;
-         iovec*        msg_iov;
-         size_t        msg_iovlen;
-         void*         msg_control;
-         int           msg_controllen;
-         int           msg_flags;
-    }
-
-    extern (C) {
-        int sendmsg(int s, msghdr *msg, int flags);
-        int recvmsg(int s, msghdr *msg, int flags);
-    }
 }
 
 class AsyncSocket : Socket
@@ -286,7 +266,7 @@ public:
     int send(void[][] bufs, SocketFlags flags=SocketFlags.NONE)
     {
         version (Windows) {
-            WSABUF[] wsabufs = makeSGArray(bufs);
+            WSABUF[] wsabufs = cast(WSABUF[])makeIovec(bufs);
             _ioManager.registerEvent(&m_writeEvent);
             int ret = WSASend(sock, wsabufs.ptr, wsabufs.length, NULL,
                 cast(DWORD)flags, &m_writeEvent.overlapped, NULL);
@@ -300,15 +280,11 @@ public:
             }
             return m_writeEvent.numberOfBytes;
         } else version (Posix) {
-            msghdr msg;
-            iovec[] iovs = makeSGArray(bufs);
-            msg.msg_iov = iovs.ptr;
-            msg.msg_iovlen = iovs.length;
-            int rc = sendmsg(sock, &msg, cast(int)flags);
+            int rc = super.send(bufs, flags);
             while (rc == ERROR && errno == EAGAIN) {
                 _ioManager.registerEvent(&m_writeEvent);
                 Fiber.yield();
-                rc = sendmsg(sock, &msg, cast(int)flags);
+                rc = super.send(bufs, flags);
             }
             return rc;
         }
@@ -347,7 +323,7 @@ public:
     int sendTo(void[][] bufs, SocketFlags flags, Address to)
     {
         version (Windows) {
-            WSABUF[] wsabufs = makeSGArray(bufs);
+            WSABUF[] wsabufs = cast(WSABUF[])makeIovec(bufs);
             _ioManager.registerEvent(&m_writeEvent);
             int ret = WSASendTo(sock, wsabufs.ptr, wsabufs.length, NULL,
                 cast(DWORD)flags, cast(SOCKADDR*)to.name(), to.nameLen(),
@@ -362,30 +338,42 @@ public:
             }
             return m_writeEvent.numberOfBytes;
         } else version (Posix) {
-            msghdr msg;
-            msg.msg_name = to.name();
-            msg.msg_namelen = to.nameLen();
-            iovec[] iovs = makeSGArray(bufs);
-            msg.msg_iov = iovs.ptr;
-            msg.msg_iovlen = iovs.length;
-            int rc = sendmsg(sock, &msg, cast(int)flags);
+            int rc = super.sendTo(bufs, flags, to);
             while (rc == ERROR && errno == EAGAIN) {
                 _ioManager.registerEvent(&m_writeEvent);
                 Fiber.yield();
-                rc = sendmsg(sock, &msg, cast(int)flags);
+                rc = super.sendTo(bufs, flags, to);
             }
             return rc;
         }
     }
 
-    int sendTo(void[][] bufs, Address to)
-    {
-        return sendTo(bufs, SocketFlags.NONE, to);
-    }
-
     int sendTo(void[][] bufs, SocketFlags flags=SocketFlags.NONE)
     {
-        return send(bufs, flags);
+        version (Windows) {
+            WSABUF[] wsabufs = cast(WSABUF[])makeIovec(bufs);
+            _ioManager.registerEvent(&m_writeEvent);
+            int ret = WSASendTo(sock, wsabufs.ptr, wsabufs.length, NULL,
+                cast(DWORD)flags, null, 0,
+                &m_writeEvent.overlapped, NULL);
+            if (ret && GetLastError() != WSA_IO_PENDING) {
+                return ret;
+            }
+            Fiber.yield();
+            if (!m_writeEvent.ret) {
+                SetLastError(m_writeEvent.lastError);
+                return tango.net.Socket.SOCKET_ERROR;
+            }
+            return m_writeEvent.numberOfBytes;
+        } else version (Posix) {
+            int rc = super.sendTo(bufs, flags);
+            while (rc == ERROR && errno == EAGAIN) {
+                _ioManager.registerEvent(&m_writeEvent);
+                Fiber.yield();
+                rc = super.sendTo(bufs, flags);
+            }
+            return rc;
+        }
     }
 
     override int receive(void[] buf, SocketFlags flags=SocketFlags.NONE)
@@ -426,7 +414,7 @@ public:
             if (!bufs.length)
                 badArg ("Socket.receive :: target buffer has 0 length");
 
-            WSABUF[] wsabufs = makeSGArray(bufs);
+            WSABUF[] wsabufs = cast(WSABUF[])makeIovec(bufs);
             _ioManager.registerEvent(&m_readEvent);
             int ret = WSARecv(sock, wsabufs.ptr, wsabufs.length, NULL,
                 cast(DWORD*)&flags, &m_readEvent.overlapped, NULL);
@@ -440,18 +428,11 @@ public:
             }
             return m_readEvent.numberOfBytes;
         } else version (Posix) {
-            if (!bufs.length)
-                badArg ("Socket.receive :: target buffer has 0 length");
-
-            msghdr msg;
-            iovec[] iovs = makeSGArray(bufs);
-            msg.msg_iov = iovs.ptr;
-            msg.msg_iovlen = iovs.length;
-            int rc = recvmsg(sock, &msg, cast(int)flags);
+            int rc = super.receive(bufs, flags);
             while (rc == ERROR && errno == EAGAIN) {
                 _ioManager.registerEvent(&m_readEvent);
                 Fiber.yield();
-                rc = recvmsg(sock, &msg, cast(int)flags);
+                rc = super.receive(bufs, flags);
             }
             return rc;
         }
@@ -494,13 +475,10 @@ public:
     int receiveFrom(void[][] bufs, SocketFlags flags, Address from)
     {
         version (Windows) {
-            if (!bufs.length)
-                badArg ("Socket.receiveFrom :: target buffer has 0 length");
-
-            WSABUF[] wsabufs = makeSGArray(bufs);
+            WSABUF[] iov = cast(WSABUF[])makeIovec(bufs);
             int nameLen = from.nameLen();
             _ioManager.registerEvent(&m_readEvent);
-            int ret = WSARecvFrom(sock, wsabufs.ptr, wsabufs.length, NULL,
+            int ret = WSARecvFrom(sock, iov.ptr, iov.length, NULL,
                 cast(DWORD*)&flags, cast(SOCKADDR*)from.name(), &nameLen,
                 &m_readEvent.overlapped, NULL);
             if (ret && GetLastError() != WSA_IO_PENDING) {
@@ -513,48 +491,42 @@ public:
             }
             return m_readEvent.numberOfBytes;
         } else version (Posix) {
-            if (!bufs.length)
-                badArg ("Socket.receive :: target buffer has 0 length");
-
-            msghdr msg;
-            msg.msg_name = from.name();
-            msg.msg_namelen = from.nameLen();
-            iovec[] iovs = makeSGArray(bufs);
-            msg.msg_iov = iovs.ptr;
-            msg.msg_iovlen = iovs.length;
-            int rc = recvmsg(sock, &msg, cast(int)flags);
+            int rc = super.receiveFrom(bufs, flags, from);
             while (rc == ERROR && errno == EAGAIN) {
                 _ioManager.registerEvent(&m_readEvent);
                 Fiber.yield();
-                rc = recvmsg(sock, &msg, cast(int)flags);
+                rc = super.receiveFrom(bufs, flags, from);
             }
             return rc;
         }
     }
 
-    int receiveFrom(void[][] bufs, Address from)
-    {
-        return receiveFrom(bufs, SocketFlags.NONE, from);
-    }
-
     int receiveFrom(void[][] bufs, SocketFlags flags = SocketFlags.NONE)
     {
-        return receive(bufs, flags);
-    }
-    
-protected:
-    sgbuf[] makeSGArray(void[][] bufs)
-    {
-        auto array = new sgbuf[bufs.length];
-        foreach (i, buf; bufs) {
-            array[i].buf = cast(char*)buf.ptr;
-            array[i].len = buf.length;
-        }
-        return array;
-    }
-    
-    
-    
+        version (Windows) {
+            WSABUF[] wsabuf = cast(WSABUF[])makeIovec(bufs);
+            _ioManager.registerEvent(&m_readEvent);
+            int ret = WSARecvFrom(sock, wsabuf.ptr, wsabuf.length, NULL,
+                cast(DWORD*)&flags, NULL, NULL, &m_readEvent.overlapped, NULL);
+            if (ret && GetLastError() != WSA_IO_PENDING) {
+                return ret;
+            }
+            Fiber.yield();
+            if (!m_readEvent.ret) {
+                SetLastError(m_readEvent.lastError);
+                return tango.net.Socket.SOCKET_ERROR;
+            }
+            return m_readEvent.numberOfBytes;
+        } else version (Posix) {
+            int rc = super.receiveFrom(bufs, flags);
+            while (rc == ERROR && errno == EAGAIN) {
+                _ioManager.registerEvent(&m_readEvent);
+                Fiber.yield();
+                rc = super.receiveFrom(bufs, flags);
+            }
+            return rc;
+        }        
+    }    
 
 private:
     IOManager _ioManager;

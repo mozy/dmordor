@@ -1,13 +1,13 @@
 module mordor.common.streams.socket;
 
-import mordor.common.asyncsocket;
+import tango.net.Socket;
 
 public import mordor.common.streams.stream;
 
 class SocketStream : Stream
 {
 public:
-    this(AsyncSocket s, bool ownSocket = true)
+    this(Socket s, bool ownSocket = true)
     {
         _s = s;
         _own = ownSocket;
@@ -66,7 +66,7 @@ public:
     }
 
 private:
-    AsyncSocket _s;
+    Socket _s;
     bool _own;
     bool _eof;
 }
