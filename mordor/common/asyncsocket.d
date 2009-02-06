@@ -185,6 +185,7 @@ public:
                 SetLastError(m_writeEvent.lastError);
                 exception("Unable to connect socket: ");
             }
+            setOption(SocketOptionLevel.SOCKET, SocketOption.SO_UPDATE_CONNECT_CONTEXT, null);
             return this;
         } else version (Posix) {
             super.connect(to);
@@ -230,7 +231,7 @@ public:
                     "Unable to accept socket connection");
             }
 
-            // TODO: inherit properties
+            target.setOption(SocketOptionLevel.SOCKET, SocketOption.SO_UPDATE_ACCEPT_CONTEXT, (cast(void*)&sock)[0..sock.sizeof]);
             return target;
         } else version (Posix) {
             socket_t newsock = .accept(sock, null, null);

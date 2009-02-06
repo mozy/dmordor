@@ -1,0 +1,16 @@
+diff --git tango/net/Socket.d tango/net/Socket.d
+index d3130b2..f16cfd7 100644
+--- tango/net/Socket.d
++++ tango/net/Socket.d
+@@ -410,6 +410,11 @@ version (Win32)
+                 SO_DONTROUTE =     0x10, // ?
+                 SO_TYPE =          0x1008, // ?
+ 
++                // NT-specific options
++                SO_UPDATE_ACCEPT_CONTEXT  = 0x700B,
++                SO_CONNECT_TIME           = 0x700C,
++                SO_UPDATE_CONNECT_CONTEXT = 0x7010,
++
+                 // OptionLevel.IP settings
+                 IP_MULTICAST_TTL = 10,
+                 IP_MULTICAST_LOOP = 11,
