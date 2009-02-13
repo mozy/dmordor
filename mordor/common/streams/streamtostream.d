@@ -1,7 +1,5 @@
 module mordor.common.streams.streamtostream;
 
-import tango.io.Stdout;
-
 import tango.core.Thread;
 import tango.math.Math;
 
@@ -20,100 +18,57 @@ body
     Buffer buf1 = new Buffer, buf2 = new Buffer;
     Buffer* readBuffer, writeBuffer;
     result_t readResult, writeResult;
-    Fiber thisFiber = Fiber.getThis;
-    Fiber readFiber, writeFiber;
     size_t chunkSize = 65536;
-    size_t ticket = Scheduler.getThis.ticket;
+    size_t todo;
     
-    readFiber = new Fiber(delegate void() {
-        bool first = true;
-        while (toTransfer > 0 || toTransfer == -1L) {
-            if (readBuffer == &buf1)
-                readBuffer = &buf2;
-            else
-                readBuffer = &buf1;
-            size_t todo = chunkSize;
-            if (toTransfer != -1L && toTransfer < todo)
-                todo = toTransfer;
-            readResult = src.read(*readBuffer, todo);
-            if (readResult == 0 && toTransfer != -1L) {
-                readResult = -1;
-            }
-            if (readResult <= 0) {
-                if (first) {
-                    // writeFiber has never been run
-                    break;
-                } else {
-                    // Wait for the previous write to finish
-                    Scheduler.getThis.wait(ticket);
-                    // Signal write fiber to cleanup
-                    writeBuffer = readBuffer;
-                    writeBuffer.clear();
-                    Scheduler.getThis.schedule(writeFiber);
-                    // Wait for write fiber to complete
-                    Scheduler.getThis.wait(ticket);
-                    break;
-                }
-            }
-            if (toTransfer != -1L) {
-                toTransfer -= readResult;
-            }
-            if (first) {
-                first = false;
-            } else {
-                // Wait for the previous write to finish
-                Scheduler.getThis.wait(ticket);
-                if (writeResult <= 0) {
-                    break;
-                }
-            }
-            writeBuffer = readBuffer;
-
-            Scheduler.getThis.schedule(writeFiber);
-            if (toTransfer == 0) {
-                // Wait for the previous write to finish
-                Scheduler.getThis.wait(ticket);
-                // Signal write fiber to cleanup
-                writeBuffer = readBuffer;
-                writeBuffer.clear();
-                Scheduler.getThis.schedule(writeFiber);
-                // Wait for write fiber to complete
-                Scheduler.getThis.wait(ticket);
-            }
-        }
-        // This may not be accurate in a multi-threaded environment... we
-        // might get here in another thread before the fiber actually
-        // terminates
-        assert(writeFiber.state == Fiber.State.TERM);
-        Scheduler.getThis.schedule(thisFiber);
-    });
+    void read()
+    {
+        todo = chunkSize;
+        if (toTransfer != -1L && toTransfer < todo)
+            todo = toTransfer;
+        readResult = src.read(*readBuffer, todo);
+    }
     
-    writeFiber = new Fiber(delegate void() {
-        while (true) {
-            assert(writeBuffer != null);
-            if (writeBuffer.readAvailable == 0) {
-                Scheduler.getThis.schedule(readFiber, ticket);
-                return;
-            }
-            while (writeBuffer.readAvailable > 0) {
-                writeResult = dst.write(*writeBuffer, writeBuffer.readAvailable);
-                if (writeResult <= 0) {
-                    Scheduler.getThis.schedule(readFiber, ticket);
-                    return;
-                }
-                transferred += writeResult;
-                writeBuffer.consume(writeResult);
-            }
-            Scheduler.getThis.schedule(readFiber, ticket);
-            Fiber.yield();
+    void write()
+    {
+        while(writeBuffer.readAvailable > 0) {
+            writeResult = dst.write(*writeBuffer, writeBuffer.readAvailable);
+            if (writeResult == 0)
+                writeResult = -1;
+            if (writeResult < 0)
+                break;
+            writeBuffer.consume(writeResult);
+            transferred += writeResult;
         }
-    });
-
-    Scheduler.getThis.schedule(readFiber);
-    Fiber.yield();
-
+    }
+    
+    readBuffer = &buf1;
+    read();
+    if (readResult == 0 && toTransfer != -1L)
+        readResult = -1;
     if (readResult < 0)
         return readResult;
+    if (readResult == 0)
+        return 0;    
+    
+    while (toTransfer > 0  || toTransfer == -1L) {
+        writeBuffer = readBuffer;
+        if (readBuffer == &buf1)
+            readBuffer = &buf2;
+        else
+            readBuffer = &buf1;
+        parallel_do(&read, &write);
+        if (readResult == 0 && toTransfer != -1L)
+            readResult = -1;
+        if (readResult < 0)
+            return readResult;
+        if (writeResult < 0)
+            return writeResult;
+        if (readResult == 0)
+            return 0;
+    }
+    writeBuffer = readBuffer;
+    write();
     if (writeResult < 0)
         return writeResult;
     return 0;
