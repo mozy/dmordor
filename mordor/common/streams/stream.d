@@ -48,4 +48,12 @@ public:
 
         return curPos >= curSize ? 0 : 1;
     }
+    
+    // convenience function
+    result_t write(void[] b)
+    {
+        scope Buffer buf;
+        buf.copyIn(b);
+        return write(buf, b.length);
+    }
 }
