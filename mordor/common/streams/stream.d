@@ -31,8 +31,8 @@ public:
     result_t close(CloseType type = CloseType.BOTH) { return 0; }
     result_t read(Buffer b, size_t len) { assert(false); return -1; }
     result_t write(Buffer b, size_t len) { assert(false); return -1; }
-    result_t seek(long offset, Anchor anchor, ref long size) { assert(false); return -1; }
-    result_t size(ref long size) { assert(false); return -1; }
+    result_t seek(long offset, Anchor anchor, out long pos) { assert(false); return -1; }
+    result_t size(out long size) { assert(false); return -1; }
     result_t truncate(long size) { assert(false); return -1; }
     result_t flush() { return 0; }
     result_t eof()

@@ -123,7 +123,7 @@ public:
         return len;
     }
 
-    result_t seek(long offset, Anchor anchor, ref long size)
+    result_t seek(long offset, Anchor anchor, out long pos)
     out (result)
     {
         assert(result < 0 || _readBuffer.readAvailable == 0);
@@ -140,10 +140,10 @@ public:
             offset -= _readBuffer.readAvailable;
         }
         _readBuffer.clear();
-        return super.seek(offset, anchor, size);
+        return super.seek(offset, anchor, pos);
     }
     
-    result_t size(ref long size)
+    result_t size(out long size)
     {
         result_t result = super.size(size);
         if (result == 0) {

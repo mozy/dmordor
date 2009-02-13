@@ -31,8 +31,8 @@ public:
     }
     result_t read(Buffer b, size_t len) { return _parent.read(b, len); }
     result_t write(Buffer b, size_t len) { return _parent.write(b, len); }
-    result_t seek(long offset, Anchor anchor, ref long size) { return _parent.seek(offset, anchor, size); }
-    result_t size(ref long size) { return _parent.size(size); }
+    result_t seek(long offset, Anchor anchor, out long pos) { return _parent.seek(offset, anchor, pos); }
+    result_t size(out long size) { return _parent.size(size); }
     result_t truncate(long size) { return _parent.truncate(size); }
     result_t flush() { return _parent.flush(); }
     result_t eof() { return _parent.eof(); }
