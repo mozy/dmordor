@@ -38,7 +38,7 @@ class Buffer
         void produce(size_t len)
         in
         {
-            assert(len < writeAvailable);
+            assert(len <= writeAvailable);
         }
         body
         {
@@ -46,6 +46,11 @@ class Buffer
         }
         
         void consume(size_t len)
+        in
+        {
+            assert(len <= readAvailable);
+        }
+        body
         {
             _writeIndex -= len;
             _buf = _buf[len..$];
@@ -295,7 +300,7 @@ private:
         for(auto it = _bufs.begin; it != _bufs.end; ++it) {
             Data *buf = it.ptr;
             // Strict ordering
-            assert(!seenWrite || buf.writeAvailable == 0);
+            assert(!seenWrite || seenWrite && buf.readAvailable == 0);
             read += buf.readAvailable;
             write += buf.writeAvailable;
             if (!seenWrite && buf.writeAvailable != 0) {
@@ -304,6 +309,7 @@ private:
             }
         }
         assert(read == _readAvailable);
-        assert(write == _writeAvailable);        
+        assert(write == _writeAvailable); 
+        assert(write != 0 || write == 0 && _writeIt == _bufs.end);
     }
 }
