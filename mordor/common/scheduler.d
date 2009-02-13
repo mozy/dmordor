@@ -243,16 +243,18 @@ private:
     Condition m_cond;
 }
 
-
 void
-parallel_do(void delegate()[] todo) {
-    int completed = 0;
+parallel_do(void delegate()[] dgs ...) {
+    size_t executed = 0;
+    size_t completed = 0;
     Fiber current = Fiber.getThis;
 
-    foreach(d; todo) {
+    foreach(dg; dgs) {
         Fiber f = new Fiber(delegate void() {
-            d();
-            if (atomicIncrement(completed) == todo.length) {
+            // can't use dg(), because this doesn't get executed until
+            // the Fiber.yield() below, and dg will be out of scope
+            dgs[atomicIncrement(executed) - 1]();
+            if (atomicIncrement(completed) == dgs.length) {
                 Scheduler.getThis.schedule(current);
             }
         });
