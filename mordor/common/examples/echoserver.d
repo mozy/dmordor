@@ -19,7 +19,7 @@ void main(char[][])
         while(true) {
             Socket newsocket = s.accept();
             Connection newconn = new Connection(newsocket);
-            Scheduler.autoschedule(new Fiber(&newconn.run));
+            Scheduler.getThis.schedule(new Fiber(&newconn.run));
         }
     }));
 

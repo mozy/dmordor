@@ -36,7 +36,7 @@ version(Windows)
 
         void registerEvent(AsyncEvent* e)
         {
-            e._scheduler = Scheduler.current;
+            e._scheduler = Scheduler.getThis;
             e._fiber = Fiber.getThis;
             synchronized (this) {
                 assert(!(&e.overlapped in m_pendingEvents));

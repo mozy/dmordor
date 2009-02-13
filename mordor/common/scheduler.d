@@ -3,33 +3,34 @@ module mordor.common.scheduler;
 import tango.core.Atomic;
 import tango.core.Thread;
 import tango.core.sync.Condition;
-import tango.util.container.CircularList;
+
+import mordor.common.containers.linkedlist;
 
 class ThreadPool
 {
 public:
     this(char[] name, void delegate() proc, int threads = 1)
     {
-        m_name = name;
-        m_proc = proc;
-        m_threads = new Thread[threads];
+        _name = name;
+        _proc = proc;
+        _threads = new Thread[threads];
     }
 
     void start(bool useCaller)
     {
-        foreach (i, t; m_threads) {
+        foreach (i, t; _threads) {
             if (useCaller && i == 0) {
                 t = Thread.getThis;
-                t.name = m_name;
+                t.name = _name;
                 continue;
             }
-            t = new Thread(m_proc);
-            t.name = m_name;
+            t = new Thread(_proc);
+            t.name = _name;
             t.start();
         }
 
         if (useCaller) {
-            m_proc();
+            _proc();
         }
     }
 
@@ -37,10 +38,10 @@ public:
     contains(Thread t)
     {
         synchronized (this) {
-            foreach (m_t; m_threads) {
-                if (m_t == t) {
+            foreach (_t; _threads) {
+                /*if (_t == t) {
                     return true;
-                }
+                }*/
             }
         }
         return false;
@@ -49,22 +50,29 @@ public:
     size_t
     size()
     {
-        synchronized (this) return m_threads.length;
+        synchronized (this) return _threads.length;
     }
 
     char[] name()
     {
-        return m_name;
+        return _name;
     }
 
 private:
-    char[] m_name;
-    void delegate() m_proc;
-    Thread[] m_threads;
+    char[]          _name;
+    void delegate() _proc;
+    Thread[]        _threads;
 }
 
 class Scheduler
 {
+private:
+    struct FiberAndTicket
+    {
+        Fiber  fiber;
+        size_t ticket;
+    }
+
 public:
     static this()
     {
@@ -73,19 +81,13 @@ public:
 
     this(char[] name, int threads = 1)
     {
-        m_fibers = new CircularList!(Fiber)();
-        m_threads = new ThreadPool(name, &run, threads);
-    }
-
-    static void
-    autoschedule(Fiber f)
-    {
-        assert(t_scheduler.val);
-        t_scheduler.val.schedule(f);
+        _fibers = new LinkedList!(FiberAndTicket)();
+        _threads = new ThreadPool(name, &run, threads);
+        _ticket = 1;
     }
 
     static Scheduler
-    current()
+    getThis()
     {
         assert(t_scheduler.val);
         return t_scheduler.val;
@@ -94,7 +96,7 @@ public:
     void start(bool useCaller = false)
     {
         atomicStore(_stopping, false);
-        m_threads.start(useCaller);
+        _threads.start(useCaller);
     }
     
     void stop()
@@ -109,12 +111,12 @@ public:
     }
 
     void
-    schedule(Fiber f)
+    schedule(Fiber f, size_t ticket = 0)
     {
         assert(f);
-        synchronized (m_fibers) {
-            m_fibers.append(f);
-            if (m_fibers.size() == 1) {
+        synchronized (_fibers) {
+            _fibers.append(FiberAndTicket(f, ticket));
+            if (_fibers.size == 1) {
                 tickle();
             }
         }
@@ -122,17 +124,31 @@ public:
 
     void switchTo()
     {
-        /*if (m_threads.contains(Thread.getThis)) {
+        if (_threads.contains(Thread.getThis)) {
             return;
-        }*/
+        }
         schedule(Fiber.getThis);
+        Fiber.yield();
+    }
+    
+    size_t ticket()
+    {
+        return atomicIncrement(_ticket);
+    }
+    
+    void wait(size_t ticket)
+    {
+        synchronized (_fibers) {
+            assert((Fiber.getThis in _waiters) is null);
+            _waiters[Fiber.getThis] = ticket;
+        }
         Fiber.yield();
     }
 
     ThreadPool
     threads()
     {
-        return m_threads;
+        return _threads;
     }
 
 protected:
@@ -146,16 +162,27 @@ private:
         Fiber idleFiber = new Fiber(&idle);
         while (true) {
             Fiber f;
-            synchronized (m_fibers) {
-                if (m_fibers.size() != 0) {
-                    foreach(fiber; m_fibers) {
-                        if (fiber.state == Fiber.State.EXEC) {
-                            continue;
-                        }
-                        f = fiber;
-                        m_fibers.remove(fiber, false);
-                        break;
+            synchronized (_fibers) {
+                for (auto it = _fibers.begin; it != _fibers.end; ++it) {
+                    
+                    if (it.ptr.fiber.state == Fiber.State.EXEC) {
+                        continue;
                     }
+                    size_t* ticket = it.ptr.fiber in _waiters;
+                    // Nobody's waiting for this ticket yet
+                    if (ticket is null && it.ptr.ticket != 0) {
+                        continue;
+                    }
+                    // Somebody's waiting on a ticket, but it's not this one
+                    if (ticket !is null && *ticket != it.ptr.ticket) {
+                        continue;
+                    }
+                    if (ticket !is null) {
+                        _waiters.remove(it.ptr.fiber);
+                    }
+                    f = it.ptr.fiber;
+                    _fibers.erase(it);
+                    break;
                 }
             }
             if (f) {
@@ -174,9 +201,11 @@ private:
 private:
 
     static ThreadLocal!(Scheduler) t_scheduler;
-    ThreadPool                     m_threads;
-    CircularList!(Fiber)           m_fibers;
+    ThreadPool                     _threads;
+    LinkedList!(FiberAndTicket)    _fibers;
     bool                           _stopping;
+    size_t                         _ticket;
+    size_t[Fiber]                  _waiters;
 }
 
 class WorkerPool : Scheduler
@@ -193,8 +222,9 @@ protected:
     void idle()
     {
         while (true) {
-            if (stopping)
+            if (stopping) {
                 return;
+            }
             synchronized (m_mutex) {
                 m_cond.wait();
             }
@@ -213,24 +243,6 @@ private:
     Condition m_cond;
 }
 
-/*
-class Server
-{
-public:
-    void run() {
-        while (true) {
-            IOHandle handle = m_listen.accept();
-            Connection c = new Connection(handle);
-            {
-                scope lock (m_connections);
-                m_connections.insert(c);
-            }
-            schedule(new Fiber(c.run));
-        }
-    }
-}
-*/
-
 
 void
 parallel_do(void delegate()[] todo) {
@@ -241,10 +253,10 @@ parallel_do(void delegate()[] todo) {
         Fiber f = new Fiber(delegate void() {
             d();
             if (atomicIncrement(completed) == todo.length) {
-                Scheduler.autoschedule(current);
+                Scheduler.getThis.schedule(current);
             }
         });
-        Scheduler.autoschedule(f);
+        Scheduler.getThis.schedule(f);
     }
     Fiber.yield();
 }
@@ -260,7 +272,7 @@ public:
         this(s.threads);
     }
     this() {
-        this(Scheduler.current);
+        this(Scheduler.getThis);
     }
     T current() {
         Thread t = Thread.getThis;

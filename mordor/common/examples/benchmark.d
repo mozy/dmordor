@@ -30,7 +30,7 @@ void main(char[][] args)
             while(true) {
                 Socket newsocket = s.accept();
                 ServerConnection newconn = new ServerConnection(newsocket);
-                Scheduler.autoschedule(new Fiber(&newconn.run));
+                Scheduler.getThis.schedule(new Fiber(&newconn.run));
             }
         }));
     }
@@ -111,7 +111,7 @@ public:
 	        calcItersNew();
             g_stopwatch.start();
             foreach(f; g_clients[0..g_connected]) {
-                Scheduler.autoschedule(f);
+                Scheduler.getThis.schedule(f);
             }
         }
         Fiber.yield();
