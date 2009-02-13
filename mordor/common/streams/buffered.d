@@ -193,6 +193,33 @@ public:
         return super.flush();
     }
     
+    result_t getDelimited(out char[] buf, char delim = '\n')
+    {
+        while(true) {
+            size_t readAvailable = _readBuffer.readAvailable;
+            if (readAvailable >= _getDelimitedSanitySize.val) {
+                return -1;
+            }
+            if (readAvailable > 0) {
+                bool success = _readBuffer.getDelimited(buf, delim);
+                if (success) {
+                    return 0;
+                }
+            }
+
+            result_t result = super.read(_readBuffer, _bufferSize);
+            if (result < 0) {
+                return result;
+            } else if (result == 0) {
+                // EOF
+                buf.length = readAvailable;
+                _readBuffer.copyOut(buf, readAvailable);
+                _readBuffer.consume(readAvailable);
+                return 1;
+            }
+        }
+    }
+    
     void unread(Buffer b, size_t len)
     {
         scope Buffer buf;

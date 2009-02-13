@@ -1,6 +1,7 @@
 module mordor.common.streams.buffer;
 
 import tango.math.Math;
+import tango.stdc.string;
 
 import mordor.common.containers.linkedlist;
 
@@ -284,6 +285,67 @@ public:
         }
         _bufs.insert(_writeIt, newBuf);
         _readAvailable += buf.length;
+    }
+    
+    void copyOut(void[] buf, size_t len)
+    in
+    {
+        assert(len <= readAvailable);
+        assert(buf.length >= len);
+    }
+    out
+    {
+        assert(buf.length == len);
+    }
+    body
+    {
+        size_t remaining = len;
+        size_t sofar = 0;
+        foreach(b; _bufs) {
+            size_t todo = min(remaining, b.readAvailable);
+            buf[sofar..sofar + todo] = b.readBuf[0..todo];
+            remaining -= todo;
+            sofar += todo;
+            if (remaining == 0)
+                break;
+        }
+    }
+    
+    bool getDelimited(out char[] buf, char delim, size_t len = 0)
+    in
+    {
+        assert(len <= readAvailable);
+    }
+    body
+    {
+        if (len == 0)
+            len = readAvailable;
+        
+        size_t totalLength;
+        bool success = false;
+
+        foreach(b; _bufs)
+        {
+            void* start = b.readBuf.ptr;
+            size_t toscan = min(len, b.readAvailable);
+            void* point = memchr(start, delim, toscan);
+            if (point !is null) {
+                success = true;
+                totalLength += point - start;
+                break;
+            }
+            totalLength += toscan;
+            len -= toscan;
+            if (len == 0)
+                break;   
+        }
+        if (success) {
+            buf.length = totalLength;
+            void[] voidbuf = cast(void[])buf;
+            copyOut(voidbuf, totalLength);
+            consume(totalLength + 1);
+        }
+        return success;
     }
 
 private:
