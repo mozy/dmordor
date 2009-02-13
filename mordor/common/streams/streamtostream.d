@@ -38,7 +38,7 @@ body
         if (toTransfer != -1L && toTransfer < todo)
             todo = toTransfer;
         readResult = src.read(*readBuffer, todo);
-        if (readResult > 0) {
+        if (readResult > 0 && toTransfer != -1) {
             toTransfer -= readResult;
         }
     }
