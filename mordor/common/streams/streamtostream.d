@@ -1,6 +1,5 @@
 module mordor.common.streams.streamtostream;
 
-import tango.core.Thread;
 import tango.math.Math;
 
 import mordor.common.scheduler;

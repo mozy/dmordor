@@ -1,6 +1,5 @@
 module mordor.common.examples.simpleclient;
 
-import tango.core.Thread;
 import tango.io.Stdout;
 import tango.net.InternetAddress;
 import tango.util.Convert;

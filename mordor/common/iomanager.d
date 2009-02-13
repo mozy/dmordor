@@ -1,6 +1,5 @@
 module mordor.common.iomanager;
 
-import tango.core.Thread;
 import tango.io.Stdout;
 
 public import mordor.common.scheduler;

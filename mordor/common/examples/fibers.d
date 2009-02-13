@@ -1,6 +1,5 @@
 module mordor.common.examples.fibers;
 
-import tango.core.Thread;
 import tango.io.Stdout;
 
 import mordor.common.scheduler;

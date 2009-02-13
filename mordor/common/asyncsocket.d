@@ -1,7 +1,6 @@
 module mordor.common.asyncsocket;
 
 import tango.core.Exception;
-import tango.core.Thread;
 public import tango.net.Socket;
 import tango.io.Stdout;
 

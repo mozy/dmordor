@@ -1,6 +1,5 @@
 module mordor.common.examples.cat;
 
-import tango.core.Thread;
 import tango.io.Stdout;
 
 import mordor.common.scheduler;

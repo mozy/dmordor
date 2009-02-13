@@ -1,7 +1,7 @@
 module mordor.common.scheduler;
 
 import tango.core.Atomic;
-import tango.core.Thread;
+public import tango.core.Thread;
 import tango.core.sync.Condition;
 
 import mordor.common.containers.linkedlist;

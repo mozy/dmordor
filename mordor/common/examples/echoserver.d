@@ -1,6 +1,5 @@
 module mordor.common.examples.echoserver;
 
-import tango.core.Thread;
 import tango.io.Stdout;
 import tango.net.InternetAddress;
 

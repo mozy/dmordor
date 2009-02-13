@@ -1,7 +1,6 @@
 module mordor.common.examples.benchmark;
 
 import tango.core.Atomic;
-import tango.core.Thread;
 import tango.io.Stdout;
 import tango.math.Math;
 import tango.net.InternetAddress;
