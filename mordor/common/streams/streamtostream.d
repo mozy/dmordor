@@ -2,14 +2,26 @@ module mordor.common.streams.streamtostream;
 
 import tango.math.Math;
 
+import mordor.common.config;
 import mordor.common.scheduler;
 import mordor.common.streams.stream;
+
+private ConfigVar!(size_t) _chunkSize;
+
+static this()
+{
+    _chunkSize =
+    Config.lookup!(size_t)("stream.streamtostream.chunksize",
+        64u * 1024u, "Size of buffers to use when transferring streams");
+}
 
 result_t streamToStream(Stream src, Stream dst, out long transferred, long toTransfer)
 in
 {
     assert(src !is null);
+    assert(src.supportsRead);
     assert(dst !is null);
+    assert(dst.supportsWrite);
     assert(toTransfer >= 0L || toTransfer == -1L);
 }
 body
@@ -17,7 +29,7 @@ body
     Buffer buf1 = new Buffer, buf2 = new Buffer;
     Buffer* readBuffer, writeBuffer;
     result_t readResult, writeResult;
-    size_t chunkSize = 65536;
+    size_t chunkSize = _chunkSize.val;
     size_t todo;
     
     void read()
@@ -26,6 +38,9 @@ body
         if (toTransfer != -1L && toTransfer < todo)
             todo = toTransfer;
         readResult = src.read(*readBuffer, todo);
+        if (readResult > 0) {
+            toTransfer -= readResult;
+        }
     }
     
     void write()
