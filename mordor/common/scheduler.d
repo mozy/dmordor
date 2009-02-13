@@ -66,13 +66,6 @@ private:
 
 class Scheduler
 {
-private:
-    struct FiberAndTicket
-    {
-        Fiber  fiber;
-        size_t ticket;
-    }
-
 public:
     static this()
     {
@@ -81,9 +74,8 @@ public:
 
     this(char[] name, int threads = 1)
     {
-        _fibers = new LinkedList!(FiberAndTicket)();
+        _fibers = new LinkedList!(Fiber)();
         _threads = new ThreadPool(name, &run, threads);
-        _ticket = 1;
     }
 
     static Scheduler
@@ -111,11 +103,11 @@ public:
     }
 
     void
-    schedule(Fiber f, size_t ticket = 0)
+    schedule(Fiber f)
     {
         assert(f);
         synchronized (_fibers) {
-            _fibers.append(FiberAndTicket(f, ticket));
+            _fibers.append(f);
             if (_fibers.size == 1) {
                 tickle();
             }
@@ -128,20 +120,6 @@ public:
             return;
         }
         schedule(Fiber.getThis);
-        Fiber.yield();
-    }
-    
-    size_t ticket()
-    {
-        return atomicIncrement(_ticket);
-    }
-    
-    void wait(size_t ticket)
-    {
-        synchronized (_fibers) {
-            assert((Fiber.getThis in _waiters) is null);
-            _waiters[Fiber.getThis] = ticket;
-        }
         Fiber.yield();
     }
 
@@ -164,23 +142,10 @@ private:
             Fiber f;
             synchronized (_fibers) {
                 for (auto it = _fibers.begin; it != _fibers.end; ++it) {
-                    
-                    if (it.ptr.fiber.state == Fiber.State.EXEC) {
+                    f = it.val;
+                    if (f.state == Fiber.State.EXEC) {
                         continue;
                     }
-                    size_t* ticket = it.ptr.fiber in _waiters;
-                    // Nobody's waiting for this ticket yet
-                    if (ticket is null && it.ptr.ticket != 0) {
-                        continue;
-                    }
-                    // Somebody's waiting on a ticket, but it's not this one
-                    if (ticket !is null && *ticket != it.ptr.ticket) {
-                        continue;
-                    }
-                    if (ticket !is null) {
-                        _waiters.remove(it.ptr.fiber);
-                    }
-                    f = it.ptr.fiber;
                     _fibers.erase(it);
                     break;
                 }
@@ -202,10 +167,8 @@ private:
 
     static ThreadLocal!(Scheduler) t_scheduler;
     ThreadPool                     _threads;
-    LinkedList!(FiberAndTicket)    _fibers;
+    LinkedList!(Fiber)             _fibers;
     bool                           _stopping;
-    size_t                         _ticket;
-    size_t[Fiber]                  _waiters;
 }
 
 class WorkerPool : Scheduler
