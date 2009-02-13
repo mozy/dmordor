@@ -39,7 +39,7 @@ public:
     
 protected:
     Stream parent(Stream parent) { return _parent = parent; }
-    bool ownsParent(bool ownsParent) { _ownsParent = ownsParent; }
+    void ownsParent(bool ownsParent) { _ownsParent = ownsParent; }
     
 private:
     Stream _parent;

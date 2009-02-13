@@ -5,9 +5,19 @@ import tango.math.Math;
 import mordor.common.config;
 public import mordor.common.streams.filter;
 
-private static ConfigVar!(size_t) _defaultBufferSize =
-    Config.lookup!(size_t)("stream.buffered.defaultbuffersize",
-        64 * 1024, "Default buffer size for BufferedStream");
+private ConfigVar!(size_t) _defaultBufferSize;
+private ConfigVar!(size_t) _getDelimitedSanitySize;
+
+static this()
+{
+    _defaultBufferSize =
+        Config.lookup!(size_t)("stream.buffered.defaultbuffersize",
+        64u * 1024u, "Default buffer size for BufferedStream");
+    _getDelimitedSanitySize = 
+        Config.lookup!(size_t)("stream.buffered.getdelimitedsanitysize",
+        16u * 1024u * 1024u,
+        "Maximum amount to buffer before failing a getDelimited call");
+}
 
 class BufferedStream : FilterStream
 {
@@ -28,12 +38,6 @@ public:
     bool allowPartialReads(bool allowPartialReads) { return _allowPartialReads = allowPartialReads; }
 
     result_t read(Buffer b, size_t len)
-    out (result)
-    {
-        // Must be failure, complete read, or partial reads are allowed
-        assert(_allowPartialReads || result == len || result < 0);
-    }
-    body
     {
         size_t remaining = len;
 
@@ -47,7 +51,7 @@ public:
                 // Read enough to satisfy this request, plus up to a multiple of the buffer size 
                 size_t todo = ((remaining - 1) / _bufferSize + 1) * _bufferSize;
                 result_t result = super.read(_readBuffer, todo);
-                if (result < 0) {
+                if (result <= 0) {
                     if (remaining == len) {
                         return result;
                     } else {
@@ -55,7 +59,7 @@ public:
                     }
                 }
     
-                buffered = min(_readBuffer.readAvalable, remaining);
+                buffered = min(_readBuffer.readAvailable, remaining);
                 b.copyIn(_readBuffer, buffered);
                 _readBuffer.consume(buffered);
                 remaining -= buffered;
@@ -81,13 +85,13 @@ public:
     out (result)
     {
         // Partial writes not allowed
-        assert(result == len || result < 0);
+        assert(result == b.length || result < 0);
     }
     body
     {
         _writeBuffer.reserve(_bufferSize);
         _writeBuffer.copyIn(b);
-        return flushWrite(len);        
+        return flushWrite(b.length);        
     }
     
     private result_t flushWrite(size_t len)
