@@ -12,7 +12,7 @@ static this()
 {
     _chunkSize =
     Config.lookup!(size_t)("stream.streamtostream.chunksize",
-        64u * 1024u, "Size of buffers to use when transferring streams");
+        cast(size_t)(64 * 1024), "Size of buffers to use when transferring streams");
 }
 
 result_t streamToStream(Stream src, Stream dst, out long transferred, long toTransfer)

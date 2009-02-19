@@ -12,10 +12,10 @@ static this()
 {
     _defaultBufferSize =
         Config.lookup!(size_t)("stream.buffered.defaultbuffersize",
-        64u * 1024u, "Default buffer size for BufferedStream");
+        cast(size_t)(64 * 1024), "Default buffer size for BufferedStream");
     _getDelimitedSanitySize = 
         Config.lookup!(size_t)("stream.buffered.getdelimitedsanitysize",
-        16u * 1024u * 1024u,
+        cast(size_t)(16 * 1024 * 1024),
         "Maximum amount to buffer before failing a getDelimited call");
 }
 
