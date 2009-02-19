@@ -146,11 +146,11 @@ version(Windows)
                     (*current).event.events |= e.event.events;
                 }
                 if (e.event.events & EPOLLIN) {
-                    (*current)._schedulerIn = Scheduler.current;
+                    (*current)._schedulerIn = Scheduler.getThis;
                     (*current)._fiberIn = Fiber.getThis;
                 }
                 if (e.event.events & EPOLLOUT) {
-                    (*current)._schedulerOut = Scheduler.current;
+                    (*current)._schedulerOut = Scheduler.getThis;
                     (*current)._fiberOut = Fiber.getThis;
                 }
                 //Stdout.formatln("Registering events {} for fd {}", (*current).event.events,
