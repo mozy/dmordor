@@ -1,14 +1,21 @@
 module mordor.common.examples.fibers;
 
 import tango.io.Stdout;
+import tango.util.log.AppendConsole;
 
+import mordor.common.config;
 import mordor.common.scheduler;
+import mordor.common.log;
 
 WorkerPool poolA;
 WorkerPool poolB;
 
 void main(char[][] args)
 {
+    Config.loadFromEnvironment();
+    Log.root.add(new AppendConsole());
+    enableLoggers();
+
     poolA = new WorkerPool("PoolA", 5);
     poolB = new WorkerPool("PoolB", 5);
 
