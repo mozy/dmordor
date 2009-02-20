@@ -9,7 +9,7 @@ import mordor.common.iomanager;
 import mordor.common.streams.buffered;
 import mordor.common.streams.limited;
 import mordor.common.streams.socket;
-import mordor.common.streams.fd;
+import mordor.common.streams.std;
 import mordor.common.streams.streamtostream;
 import mordor.common.stringutils;
 
@@ -49,7 +49,7 @@ int main(string[] args)
         AsyncSocket socket = new AsyncSocket(ioManager, AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
         socket.connect(new InternetAddress(args[1], to!(int)(args[2])));
         BufferedStream tds = new BufferedStream(new SocketStream(socket));
-        Stream stdout = new FDStream(1);
+        Stream stdout = new StdoutStream;
         Stream object;
         
         result_t result = raw(tds, args[3], object);
