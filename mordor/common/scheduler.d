@@ -3,6 +3,7 @@ module mordor.common.scheduler;
 import tango.core.Atomic;
 public import tango.core.Thread;
 import tango.core.sync.Condition;
+import tango.util.log.Log;
 
 import mordor.common.containers.linkedlist;
 
@@ -70,6 +71,7 @@ public:
     static this()
     {
         t_scheduler = new ThreadLocal!(Scheduler)();
+        _log = Log.lookup("mordor.common.scheduler");
     }
 
     this(char[] name, int threads = 1)
@@ -106,6 +108,8 @@ public:
     schedule(Fiber f)
     {
         assert(f);
+        _log.trace("Scheduling fiber {} in scheduler {} from thread {}",
+            cast(void*)f, _threads.name, cast(void*)Thread.getThis);
         synchronized (_fibers) {
             _fibers.append(f);
             if (_fibers.size == 1) {
@@ -117,6 +121,8 @@ public:
     void switchTo()
     {
         if (_threads.contains(Thread.getThis)) {
+            _log.trace("Skipping switch to scheduler {} because we're already on thread {}",
+                _threads.name, cast(void*)Thread.getThis);
             return;
         }
         schedule(Fiber.getThis);
@@ -138,6 +144,7 @@ private:
     {
         t_scheduler.val = this;
         Fiber idleFiber = new Fiber(&idle);
+        _log.trace("Starting thread {} in scheduler {}", cast(void*)Thread.getThis, _threads.name);
         while (true) {
             Fiber f;
             synchronized (_fibers) {
@@ -152,14 +159,19 @@ private:
             }
             if (f) {
                 if (f.state != Fiber.State.TERM) {
+                    _log.trace("Calling fiber {} on thread {} in scheduler {}", cast(void*)f, cast(void*)Thread.getThis, _threads.name);
                     f.call();
+                    _log.trace("Returning from fiber {} on thread {} in scheduler {}", cast(void*)f, cast(void*)Thread.getThis, _threads.name);
                 }
                 continue;
             }
             if (idleFiber.state == Fiber.State.TERM) {
+                _log.trace("Exiting thread {} in scheduler {}", cast(void*)Thread.getThis, _threads.name);
                 return;
             }
+            _log.trace("Idling on thread {} in scheduler {}", cast(void*)Thread.getThis, _threads.name);
             idleFiber.call();
+            _log.trace("Idling complete on thread {} in scheduler {}", cast(void*)Thread.getThis, _threads.name);
         }
     }
 
@@ -169,6 +181,7 @@ private:
     ThreadPool                     _threads;
     LinkedList!(Fiber)             _fibers;
     bool                           _stopping;
+    static Logger                   _log;
 }
 
 class WorkerPool : Scheduler
@@ -176,8 +189,8 @@ class WorkerPool : Scheduler
 public:
     this(char[] name, int threads = 1)
     {
-        m_mutex = new Mutex();
-        m_cond = new Condition(m_mutex);
+        _mutex = new Mutex();
+        _cond = new Condition(_mutex);
         super(name, threads);
     }
 
@@ -188,22 +201,22 @@ protected:
             if (stopping) {
                 return;
             }
-            synchronized (m_mutex) {
-                m_cond.wait();
+            synchronized(_mutex) {
+                _cond.wait();
             }
             Fiber.yield();
         }
     }
     void tickle()
     {
-        synchronized (m_mutex) {
-            m_cond.notifyAll();
+        synchronized(_mutex) {
+            _cond.notify();
         }
     }
 
 private:
-    Mutex m_mutex;
-    Condition m_cond;
+    Mutex     _mutex;
+    Condition _cond;
 }
 
 void
