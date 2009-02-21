@@ -135,6 +135,11 @@ public:
         return _threads;
     }
 
+    char[] name()
+    {
+        return _threads.name;
+    }
+
 protected:
     abstract void idle();
     abstract void tickle();
