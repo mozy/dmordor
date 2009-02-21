@@ -1,4 +1,4 @@
-module mordor.common.streams.streamtostream;
+module mordor.common.streams.transfer;
 
 import tango.math.Math;
 import tango.util.log.Log;
@@ -13,12 +13,12 @@ private Logger _log;
 static this()
 {
     _chunkSize =
-    Config.lookup!(size_t)("stream.streamtostream.chunksize",
+    Config.lookup!(size_t)("stream.transfer.chunksize",
         cast(size_t)(64 * 1024), "Size of buffers to use when transferring streams");
-    _log = Log.lookup("mordor.common.streams.streamtostream");
+    _log = Log.lookup("mordor.common.streams.transfer");
 }
 
-result_t streamToStream(Stream src, Stream dst, out long transferred, long toTransfer)
+result_t transferStream(Stream src, Stream dst, out long transferred, long toTransfer)
 in
 {
     assert(src !is null);
@@ -98,13 +98,13 @@ body
     return 0;
 }
 
-result_t streamToStream(Stream src, Stream dst)
+result_t transferStream(Stream src, Stream dst)
 {
     long transferred;
-    return streamToStream(src, dst, transferred, -1L);
+    return transferStream(src, dst, transferred, -1L);
 }
 
-result_t streamToStream(Stream src, Stream dst, out long transferred)
+result_t transferStream(Stream src, Stream dst, out long transferred)
 {
-    return streamToStream(src, dst, transferred, -1L);
+    return transferStream(src, dst, transferred, -1L);
 }

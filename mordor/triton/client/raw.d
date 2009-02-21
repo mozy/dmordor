@@ -10,7 +10,7 @@ import mordor.common.streams.buffered;
 import mordor.common.streams.limited;
 import mordor.common.streams.socket;
 import mordor.common.streams.std;
-import mordor.common.streams.streamtostream;
+import mordor.common.streams.transfer;
 import mordor.common.stringutils;
 
 result_t raw(BufferedStream tds, string objectName, out Stream object)
@@ -57,7 +57,7 @@ int main(string[] args)
             Stderr.formatln("Failed to communicate with triton: {}", result);
             return;
         }
-        result = streamToStream(object, stdout);
+        result = transferStream(object, stdout);
         if (result < 0) {
             Stderr.formatln("Failed to read object from triton: {}", result);
             return;

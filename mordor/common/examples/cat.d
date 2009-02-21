@@ -6,7 +6,7 @@ import mordor.common.config;
 import mordor.common.log;
 import mordor.common.scheduler;
 import mordor.common.streams.std;
-import mordor.common.streams.streamtostream;
+import mordor.common.streams.transfer;
 
 void main()
 {
@@ -20,7 +20,7 @@ void main()
     WorkerPool pool = new WorkerPool("pool", 2);
 
     pool.schedule(new Fiber(delegate void() {
-        streamToStream(stdin, stdout);
+        transferStream(stdin, stdout);
         pool.stop();
     }));
     pool.start(true);
