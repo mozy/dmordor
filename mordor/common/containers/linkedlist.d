@@ -144,6 +144,24 @@ public:
         it._node._next._prev = it._node._prev;
         static if(includeSize) --_size;
     }
+    
+    void erase(Iterator start, Iterator stop)
+    in
+    {
+        assert(start != end);
+    }
+    body
+    {
+        start._node._prev._next = stop._node;
+        stop._node._prev = start._node._prev;
+        static if(includeSize) {
+            Node* node = start._node;
+            while (node != stop._node) {
+                --_size;
+                node = node._next;
+            }
+        }
+    }
 
     void clear()
     {
