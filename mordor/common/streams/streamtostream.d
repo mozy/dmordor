@@ -1,18 +1,21 @@
 module mordor.common.streams.streamtostream;
 
 import tango.math.Math;
+import tango.util.log.Log;
 
 import mordor.common.config;
 import mordor.common.scheduler;
 import mordor.common.streams.stream;
 
 private ConfigVar!(size_t) _chunkSize;
+private Logger _log;
 
 static this()
 {
     _chunkSize =
     Config.lookup!(size_t)("stream.streamtostream.chunksize",
         cast(size_t)(64 * 1024), "Size of buffers to use when transferring streams");
+    _log = Log.lookup("mordor.common.streams.streamtostream");
 }
 
 result_t streamToStream(Stream src, Stream dst, out long transferred, long toTransfer)
@@ -56,8 +59,11 @@ body
         }
     }
     
+    _log.trace("Transferring from {} to {}, limit {}", cast(void*)src,
+        cast(void*)dst, toTransfer);        
     readBuffer = &buf1;
     read();
+    _log.trace("Read {} from {}", readResult, cast(void*)src);
     if (readResult == 0 && toTransfer != -1L)
         readResult = -1;
     if (readResult < 0)
@@ -72,6 +78,8 @@ body
         else
             readBuffer = &buf1;
         parallel_do(&read, &write);
+        _log.trace("Read {} from {}; wrote {} to {}; {} total transferred",
+            readResult, cast(void*)src, writeResult, cast(void*)dst, transferred);
         if (readResult == 0 && toTransfer != -1L)
             readResult = -1;
         if (readResult < 0)
@@ -83,6 +91,8 @@ body
     }
     writeBuffer = readBuffer;
     write();
+    _log.trace("Wrote {} to {}; {} total transferred", writeResult,
+        cast(void*)dst, transferred);
     if (writeResult < 0)
         return writeResult;
     return 0;
