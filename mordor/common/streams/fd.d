@@ -33,7 +33,7 @@ public:
     
     result_t read(Buffer b, size_t len)
     {
-        iovec[] iov = makeIovec(b.writeBuf(len));
+        iovec[] iov = makeIovec(b.writeBufs(len));
         int rc = readv(_fd, iov.ptr, iov.length);
         if (rc > 0) {
             b.produce(rc);
@@ -43,7 +43,7 @@ public:
     
     result_t write(Buffer b, size_t len)
     {
-        iovec[] iov = makeIovec(b.readBuf(len));
+        iovec[] iov = makeIovec(b.readBufs(len));
         return writev(_fd, iov.ptr, iov.length);
     }
     

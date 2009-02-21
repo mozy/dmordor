@@ -113,7 +113,30 @@ public:
         }
     }
     
+    void compact()
+    out
+    {
+        assert(writeAvailable == 0);
+    }
+    body
+    {
+        if (_writeIt != _bufs.end) {
+            if (_writeIt.ptr.readAvailable > 0) {
+                Data newBuf = Data(_writeIt.ptr.readBuf);
+                _bufs.insert(_writeIt, newBuf);
+            }
+            _bufs.erase(_writeIt, _bufs.end);
+            _writeAvailable = 0;
+        }
+    }
+    
     void clear()
+    out
+    {
+        assert(readAvailable == 0);
+        assert(writeAvailable == 0);
+    }
+    body
     {
         _readAvailable = _writeAvailable = 0;
         _bufs.clear();
@@ -166,7 +189,7 @@ public:
         assert(len == 0);
     }
     
-    void[][] readBuf(size_t len)
+    void[][] readBufs(size_t len)
     in
     {
         assert(len <= readAvailable);
@@ -198,9 +221,52 @@ public:
         return result;
     }
     
-    void[][] writeBuf(size_t len)
+    void[] readBuf(size_t len)
+    in
+    {
+        assert(len <= readAvailable);
+    }
     out (result)
     {
+        assert(result.length == len);
+        assert(len == 0 || result.ptr == _bufs.begin.ptr.readBuf.ptr);
+        assert(len == 0 || result.length <= _bufs.begin.ptr.readBuf.length);
+    }
+    body
+    {
+        if (readAvailable == 0) {
+            void[] result;
+            return result;
+        }
+        // Optimize case where all that is requested is contained in the
+        // first buffer
+        if (_bufs.begin.ptr.readAvailable >= len) {
+            return _bufs.begin.ptr.readBuf[0..len];
+        }
+        // try to avoid allocation
+        if (_writeIt.ptr.writeAvailable >= readAvailable) {
+            copyOut(_writeIt.ptr.writeBuf, readAvailable);
+            Data newBuf = Data(_writeIt.ptr.writeBuf[0..readAvailable]);
+            _bufs.clear();
+            _bufs.append(newBuf);
+            _writeAvailable = 0;
+            _writeIt = _bufs.end;
+            return newBuf.readBuf[0..len];
+        }
+        Data newBuf = Data(readAvailable);
+        copyOut(newBuf.writeBuf, readAvailable);
+        newBuf.produce(readAvailable);
+        _bufs.clear();
+        _bufs.append(newBuf);
+        _writeAvailable = 0;
+        _writeIt = _bufs.end;
+        return newBuf.readBuf[0..len];
+    }
+
+    void[][] writeBufs(size_t len)
+    out (result)
+    {
+        assert(writeAvailable >= len);
         size_t total = 0;
         foreach(buf; result) {
             total += buf.length;
@@ -226,6 +292,31 @@ public:
         result.length = i;
         assert(remaining == 0);
         return result;
+    }
+    
+    void[] writeBuf(size_t len)
+    out (result)
+    {
+        assert(writeAvailable >= len);
+        assert(result.length == len);
+    }
+    body
+    {
+        // Must allocate just the write buf
+        if (writeAvailable == 0) {
+            reserve(len);
+            assert(_writeIt.ptr.writeAvailable >= len);
+            return _writeIt.ptr.writeBuf[0..len];            
+        }
+        // Can use an existing write buf
+        if (writeAvailable > 0 && _writeIt.ptr.writeAvailable >= len) {
+            return _writeIt.ptr.writeBuf[0..len];
+        }
+        // Existing bufs are insufficient... remove thme and reserve anew
+        compact();
+        reserve(len);
+        assert(_writeIt.ptr.writeAvailable >= len);
+        return _writeIt.ptr.writeBuf[0..len];
     }
     
     void copyIn(Buffer buf)

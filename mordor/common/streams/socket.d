@@ -45,7 +45,7 @@ public:
 
     result_t read(Buffer b, size_t len)
     {
-        int rc = _s.receive(b.writeBuf(len));
+        int rc = _s.receive(b.writeBufs(len));
         if (rc == 0) {
             _eof = true;
         }
@@ -57,7 +57,7 @@ public:
 
     result_t write(Buffer b, size_t len)
     {
-        return _s.send(b.readBuf(len));
+        return _s.send(b.readBufs(len));
     }
     
     result_t eof()
