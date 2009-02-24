@@ -64,7 +64,7 @@ enum : uint
 
 
 result_t MAKERESULT(uint severity, uint facility, size_t code)
-/*in
+in
 {
     static if (result_t.sizeof == 8) {
         assert(code <= 0xffffU || severity == 0U && facility == 0U &&
@@ -76,7 +76,7 @@ result_t MAKERESULT(uint severity, uint facility, size_t code)
     assert(facility <= 0x1fff);
     assert(severity == 0U || severity == 1U);
 }
-body*/
+body
 {
     static if (result_t.sizeof == 8) {
         if (severity == 1) {
