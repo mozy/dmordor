@@ -24,7 +24,7 @@ public:
         }
         len = min(len, _size - _pos);
         result_t result = super.read(b, len);
-        if (result > 0) {
+        if (SUCCEEDED(result)) {
             _pos += result;
         }
         return result;
@@ -33,7 +33,7 @@ public:
     result_t write(Buffer b, size_t len)
     {
         if (_pos >= _size) {
-            return -1;
+            return E_FAIL;
         }
         len = min(len, _size - _pos);
         result_t result = super.write(b, len);
@@ -48,12 +48,12 @@ public:
         switch(anchor) {
             case Anchor.BEGIN:
                 if (offset < 0) {
-                    return -1;
+                    return E_INVALIDARG;
                 }
                 break;
             case Anchor.CURRENT:
                 if (offset + _pos < 0) {
-                    return -1;
+                    return E_INVALIDARG;
                 }
                 break;
             case Anchor.END:
@@ -64,7 +64,7 @@ public:
                 offset = s + offset;
                 anchor = Anchor.BEGIN;
                 if (offset < 0) {
-                    return -1;
+                    return E_INVALIDARG;
                 }
                 break;
             default:
@@ -80,7 +80,7 @@ public:
     {
         if (!super.supportsSize) {
             size = _size;
-            return 0;
+            return S_OK;
         }
         result_t result = super.size(size);
         if (result == 0) {
@@ -89,7 +89,7 @@ public:
         return result;
     }
     
-    result_t truncate(long size) { assert(false); return -1; }
+    result_t truncate(long size) { assert(false); return E_NOTIMPL; }
     
 private:
     long _pos, _size;

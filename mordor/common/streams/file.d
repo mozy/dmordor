@@ -7,6 +7,7 @@ import mordor.common.stringutils;
 
 version (Windows) {
     import win32.winbase;
+    import win32.winnt;
     
     import mordor.common.streams.handle;
     

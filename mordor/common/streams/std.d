@@ -29,7 +29,7 @@ public:
 	
 	bool supportsWrite() { return false; }
 	
-	result_t write() { assert(false); return -1; }
+	result_t write() { assert(false); return E_NOTIMPL; }
 }
 
 class StdoutStream : NativeStream
@@ -45,7 +45,7 @@ public:
 	
 	bool supportsRead() { return false; }
 	
-	result_t read() { assert(false); return -1; }
+	result_t read() { assert(false); return E_NOTIMPL; }
 }
 
 class StderrStream : NativeStream
@@ -61,5 +61,5 @@ public:
 	
 	bool supportsRead() { return false; }
 	
-	result_t read() { assert(false); return -1; }
+	result_t read() { assert(false); return E_NOTIMPL; }
 }

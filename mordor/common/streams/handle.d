@@ -7,6 +7,11 @@ import win32.winnt;
 import mordor.common.iomanager;
 public import mordor.common.streams.stream;
 
+alias mordor.common.result.E_NOTIMPL E_NOTIMPL;
+alias mordor.common.result.E_INVALIDARG E_INVALIDARG;
+alias mordor.common.result.S_OK S_OK;
+alias mordor.common.result.FAILED FAILED;
+
 class HandleStream : Stream
 {
 public:
@@ -43,7 +48,7 @@ public:
 			CloseHandle(_hFile);
 			_hFile = INVALID_HANDLE_VALUE;
 		}
-		return 0;
+		return S_OK;
 	}
 	
 	bool supportsRead() { return true; }
@@ -75,7 +80,7 @@ public:
             }
             if (!ret && GetLastError() != ERROR_IO_PENDING) {
                 _log.trace("Read from handle {} failed with code {}", _hFile, GetLastError());
-                return -1;
+                return RESULT_FROM_LASTERROR();
             }
             Fiber.yield();
             if (!_readEvent.ret && (_readEvent.lastError == ERROR_HANDLE_EOF ||
@@ -85,7 +90,7 @@ public:
             if (!_readEvent.ret) {
                 _log.trace("Async read from handle {} failed with code {}", _hFile,
                     _readEvent.lastError);
-                return -1;
+                return RESULT_FROM_WIN32(_readEvent.lastError);
             }
             if (supportsSeek) {
                 _pos = (cast(long)overlapped.Offset | (cast(long)overlapped.OffsetHigh << 32)) +
@@ -100,7 +105,7 @@ public:
         }
         if (!ret) {
             _log.trace("Sync read from handle {} failed with code {}", _hFile, GetLastError());
-            return -1;
+            return RESULT_FROM_LASTERROR();
         }
         _log.trace("Read {} bytes from handle {}", read, _hFile);
         b.produce(read);
@@ -125,12 +130,12 @@ public:
         if (_ioManager !is null) {
             if (!ret && GetLastError() != ERROR_IO_PENDING) {
                 _log.trace("Write to handle {} failed with code {}", _hFile, GetLastError());
-                return -1;
+                return RESULT_FROM_LASTERROR();
             }
             Fiber.yield();
             if (!_writeEvent.ret) {
                 _log.trace("Async write to handle {} failed with code {}", _hFile, _writeEvent.lastError);
-                return -1;
+                return RESULT_FROM_WIN32(_writeEvent.lastError);
             }
             if (supportsSeek) {
                 _pos = (cast(long)overlapped.Offset | (cast(long)overlapped.OffsetHigh << 32)) +
@@ -141,7 +146,7 @@ public:
         }
         if (!ret) {
             _log.trace("Sync write to handle {} failed with code {}", _hFile, GetLastError());
-            return -1;
+            return RESULT_FROM_LASTERROR();
         }
         _log.trace("Wrote {} bytes to handle {}", written, _hFile);
 		return written;
@@ -154,51 +159,52 @@ public:
                 switch (anchor) {
                     case Anchor.BEGIN:
                         if (offset < 0)
-                            return -1;
+                            return E_INVALIDARG;
                         pos = _pos = offset;
-                        return 0;
+                        return S_OK;
                     case Anchor.CURRENT:
                         if (_pos + offset < 0)
-                            return 01;
+                            return E_INVALIDARG;
                         pos = _pos = _pos + offset;
-                        return 0;
+                        return S_OK;
                     case Anchor.END:
                         result_t result = size(pos);
                         if (result != 0)
                             return result;
                         if (pos + offset < 0)
-                            return -1;
+                            return E_INVALIDARG;
                         pos = _pos = pos + offset;
-                        return 0;                    
+                        return S_OK;                    
                 }
             } else {
-                return -1;
+                return E_NOTIMPL;
             }
         }
         
         BOOL ret = SetFilePointerEx(_hFile, *cast(LARGE_INTEGER*)&offset,
             cast(LARGE_INTEGER*)&pos, cast(DWORD)anchor);
         if (!ret)
-            return -1;
-        return 0;
+            return RESULT_FROM_LASTERROR();
+        return S_OK;
     }
     
     result_t truncate(long size)
     {
         long curPos, dummy;
         result_t result = seek(0, Anchor.CURRENT, curPos);
-        if (result != 0)
+        if (FAILED(result))
             return result;
         result = seek(size, Anchor.BEGIN, dummy);
-        if (result != 0)
+        if (FAILED(result))
             return result;
         BOOL ret = SetEndOfFile(_hFile);
+        DWORD lastError = GetLastError();
         result = seek(curPos, Anchor.BEGIN, dummy);
-        if (result != 0)
+        if (FAILED(result))
             return result;
         if (!ret)
-            return -1;
-        return 0;
+            return RESULT_FROM_WIN32(lastError);
+        return S_OK;
     }
 	
 private:

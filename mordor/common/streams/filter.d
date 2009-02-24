@@ -27,7 +27,7 @@ public:
         if (ownsParent)
             return _parent.close(type);
         else
-            return 0;
+            return S_OK;
     }
     result_t read(Buffer b, size_t len) { return _parent.read(b, len); }
     result_t write(Buffer b, size_t len) { return _parent.write(b, len); }

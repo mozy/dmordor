@@ -40,7 +40,7 @@ public:
                 _s.shutdown(socketShutdown);
             }
         }
-        return 0;
+        return S_OK;
     }
 
     result_t read(Buffer b, size_t len)
@@ -52,17 +52,17 @@ public:
         if (rc > 0) {
             b.produce(rc);
         }
-        return rc;
+        return RESULT_FROM_LASTERROR(rc);
     }
 
     result_t write(Buffer b, size_t len)
     {
-        return _s.send(b.readBufs(len));
+        return RESULT_FROM_LASTERROR(_s.send(b.readBufs(len)));
     }
     
     result_t eof()
     {
-        return _eof ? 0 : 1;
+        return _eof ? S_OK : S_FALSE;
     }
 
 private:

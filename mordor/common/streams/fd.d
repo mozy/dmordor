@@ -25,7 +25,7 @@ public:
             .close(_fd);
             _fd = 0;
         }
-        return 0;
+        return S_OK;
     }
     
     bool supportsRead() { return true; }
@@ -38,13 +38,13 @@ public:
         if (rc > 0) {
             b.produce(rc);
         }
-        return rc;
+        return RESULT_FROM_LASTERROR(rc);
     }
     
     result_t write(Buffer b, size_t len)
     {
         iovec[] iov = makeIovec(b.readBufs(len));
-        return writev(_fd, iov.ptr, iov.length);
+        return RESULT_FROM_LASTERROR(writev(_fd, iov.ptr, iov.length));
     }
     
     protected static iovec[] makeIovec(void[][] bufs)

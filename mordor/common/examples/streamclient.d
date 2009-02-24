@@ -19,11 +19,11 @@ void main(char[][] args)
         scope SocketStream stream = new SocketStream(s);
         sendBuf.copyIn("hello\r\n");
         result_t result = stream.write(sendBuf, sendBuf.readAvailable);
-        if (result <= 0) {
+        if (FAILED(result) || result == 0) {
             return;
         }
         result = stream.read(receiveBuf, 8192);
-        if (result <= 0) {
+        if (FAILED(result)) {
             return;
         }
         Stdout.formatln("Read {} bytes from conn", result);

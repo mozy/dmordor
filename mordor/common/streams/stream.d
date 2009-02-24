@@ -1,8 +1,7 @@
 module mordor.common.streams.stream;
 
+public import mordor.common.result;
 public import mordor.common.streams.buffer;
-
-alias int result_t;
 
 class Stream
 {
@@ -28,13 +27,13 @@ public:
     bool supportsTruncate() { return false; }
     bool supportsEof() { return supportsSeek() && supportsSize(); }
     
-    result_t close(CloseType type = CloseType.BOTH) { return 0; }
-    result_t read(Buffer b, size_t len) { assert(false); return -1; }
-    result_t write(Buffer b, size_t len) { assert(false); return -1; }
-    result_t seek(long offset, Anchor anchor, out long pos) { assert(false); return -1; }
-    result_t size(out long size) { assert(false); return -1; }
-    result_t truncate(long size) { assert(false); return -1; }
-    result_t flush() { return 0; }
+    result_t close(CloseType type = CloseType.BOTH) { return S_OK; }
+    result_t read(Buffer b, size_t len) { assert(false); return E_NOTIMPL; }
+    result_t write(Buffer b, size_t len) { assert(false); return E_NOTIMPL; }
+    result_t seek(long offset, Anchor anchor, out long pos) { assert(false); return E_NOTIMPL; }
+    result_t size(out long size) { assert(false); return E_NOTIMPL; }
+    result_t truncate(long size) { assert(false); return E_NOTIMPL; }
+    result_t flush() { return S_OK; }
     result_t eof()
     {
         assert(supportsSeek() && supportsSize());
@@ -46,7 +45,7 @@ public:
         if (result < 0)
             return result;
 
-        return curPos >= curSize ? 0 : 1;
+        return curPos >= curSize ? S_OK : S_FALSE;
     }
     
     // convenience function

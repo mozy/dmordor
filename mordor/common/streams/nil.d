@@ -40,28 +40,28 @@ public:
     result_t seek(long offset, Anchor anchor, out long pos)
     {
         pos = 0;
-        return 0;
+        return S_OK;
     }
     
     result_t size(out long size)
     {
         size = 0;
-        return 0;
+        return S_OK;
     }
     
     result_t truncate()
     {
-        return 0;
+        return S_OK;
     }
     
     result_t flush()
     {
-        return 0;
+        return S_OK;
     }
     
     result_t eof()
     {
-        return 0;
+        return S_OK;
     }
     
 private:

@@ -32,28 +32,28 @@ body
 
     long size;
     result_t result = object.size(size);
-    if (result < 0) {
+    if (FAILED(result)) {
         return result;
     }
     
     command ~= to!(string)(size) ~ "\n";
     
     result = tds.write(command);
-    if (result < 0) {
+    if (FAILED(result)) {
         return result;        
     }
     result = transferStream(object, tds);
-    if (result < 0) {
+    if (FAILED(result)) {
         return result;
     }
     result = tds.flush();
-    if (result < 0) {
+    if (FAILED(result)) {
         return result;
     }
     
     char[] line;
     result = tds.getDelimited(line);
-    if (result < 0) {
+    if (FAILED(result)) {
         return result;
     }
     
@@ -77,7 +77,7 @@ int main(string[] args)
         Stream object = new FileStream(args[3]);
         
         result_t result = store(tds, args[4], object);
-        if (result != 0) {
+        if (FAILED(result)) {
             Stderr.formatln("Failed to communicate with triton: {}", result);
             return;
         }

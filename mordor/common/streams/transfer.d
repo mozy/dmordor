@@ -18,7 +18,8 @@ static this()
     _log = Log.lookup("mordor.common.streams.transfer");
 }
 
-result_t transferStream(Stream src, Stream dst, out long transferred, long toTransfer)
+result_t transferStream(Stream src, Stream dst, long toTransfer, out long totalRead, out long totalWritten,
+                        out result_t readResult, out result_t writeResult)
 in
 {
     assert(src !is null);
@@ -31,18 +32,17 @@ body
 {
     Buffer buf1 = new Buffer, buf2 = new Buffer;
     Buffer* readBuffer, writeBuffer;
-    result_t readResult, writeResult;
     size_t chunkSize = _chunkSize.val;
     size_t todo;
     
     void read()
     {
         todo = chunkSize;
-        if (toTransfer != -1L && toTransfer < todo)
+        if (toTransfer != -1L && toTransfer - totalRead < todo)
             todo = toTransfer;
         readResult = src.read(*readBuffer, todo);
-        if (readResult > 0 && toTransfer != -1) {
-            toTransfer -= readResult;
+        if (SUCCEEDED(readResult)) {
+            totalRead += readResult;
         }
     }
     
@@ -51,11 +51,11 @@ body
         while(writeBuffer.readAvailable > 0) {
             writeResult = dst.write(*writeBuffer, writeBuffer.readAvailable);
             if (writeResult == 0)
-                writeResult = -1;
-            if (writeResult < 0)
+                writeResult = MORDOR_E_ZEROLENGTHWRITE;
+            if (FAILED(writeResult))
                 break;
             writeBuffer.consume(writeResult);
-            transferred += writeResult;
+            totalWritten += writeResult;
         }
     }
     
@@ -65,46 +65,67 @@ body
     read();
     _log.trace("Read {} from {}", readResult, cast(void*)src);
     if (readResult == 0 && toTransfer != -1L)
-        readResult = -1;
-    if (readResult < 0)
-        return readResult;
+        return MORDOR_E_UNEXPECTEDEOF;
+    if (FAILED(readResult))
+        return MORDOR_E_READFAILURE;
     if (readResult == 0)
-        return 0;    
+        return S_OK;
     
-    while (toTransfer > 0  || toTransfer == -1L) {
+    while (totalRead < toTransfer  || toTransfer == -1L) {
         writeBuffer = readBuffer;
         if (readBuffer == &buf1)
             readBuffer = &buf2;
         else
             readBuffer = &buf1;
         parallel_do(&read, &write);
-        _log.trace("Read {} from {}; wrote {} to {}; {} total transferred",
-            readResult, cast(void*)src, writeResult, cast(void*)dst, transferred);
+        _log.trace("Read {} from {}; wrote {} to {}; {}/{} total read/written",
+            readResult, cast(void*)src, writeResult, cast(void*)dst, totalRead, totalWritten);
         if (readResult == 0 && toTransfer != -1L)
-            readResult = -1;
-        if (readResult < 0)
-            return readResult;
-        if (writeResult < 0)
-            return writeResult;
+            return MORDOR_E_UNEXPECTEDEOF;
+        if (FAILED(readResult))
+            return MORDOR_E_READFAILURE;
+        if (FAILED(writeResult))
+            return MORDOR_E_WRITEFAILURE;
         if (readResult == 0)
-            return 0;
+            return S_OK;
     }
     writeBuffer = readBuffer;
     write();
-    _log.trace("Wrote {} to {}; {} total transferred", writeResult,
-        cast(void*)dst, transferred);
-    if (writeResult < 0)
-        return writeResult;
-    return 0;
+    _log.trace("Wrote {} to {}; {}/{} total read/written", writeResult,
+        cast(void*)dst, totalRead, totalWritten);
+    if (FAILED(writeResult))
+        return MORDOR_E_WRITEFAILURE;
+    return S_OK;
 }
 
 result_t transferStream(Stream src, Stream dst)
 {
-    long transferred;
-    return transferStream(src, dst, transferred, -1L);
+    long totalRead, totalWritten;
+    result_t readResult, writeResult;
+    return transferStream(src, dst, -1L, totalRead, totalWritten, readResult, writeResult);
 }
 
-result_t transferStream(Stream src, Stream dst, out long transferred)
+result_t transferStream(Stream src, Stream dst, long toTransfer)
 {
-    return transferStream(src, dst, transferred, -1L);
+    long totalRead, totalWritten;
+    result_t readResult, writeResult;
+    return transferStream(src, dst, toTransfer, totalRead, totalWritten, readResult, writeResult);
+}
+
+result_t transferStream(Stream src, Stream dst, out long totalRead, out long totalWritten)
+{
+    result_t readResult, writeResult;
+    return transferStream(src, dst, -1L, totalRead, totalWritten, readResult, writeResult);
+}
+
+result_t transferStream(Stream src, Stream dst, long toTransfer, out long totalRead, out long totalWritten)
+{
+    result_t readResult, writeResult;
+    return transferStream(src, dst, toTransfer, totalRead, totalWritten, readResult, writeResult);
+}
+
+result_t transferStream(Stream src, Stream dst, out long totalRead, out long totalWritten,
+                        out result_t readResult, out result_t writeResult)
+{
+    return transferStream(src, dst, -1L, totalRead, totalWritten, readResult, writeResult);
 }

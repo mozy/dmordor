@@ -85,7 +85,7 @@ public:
     out (result)
     {
         // Partial writes not allowed
-        assert(result == b.length || result < 0);
+        assert(result == b.length || result <= 0);
     }
     body
     {
@@ -126,13 +126,13 @@ public:
     result_t seek(long offset, Anchor anchor, out long pos)
     out (result)
     {
-        assert(result < 0 || _readBuffer.readAvailable == 0);
-        assert(result < 0 || _writeBuffer.readAvailable == 0);
+        assert(FAILED(result) || _readBuffer.readAvailable == 0);
+        assert(FAILED(result) || _writeBuffer.readAvailable == 0);
     }
     body
     {
         result_t result = flush();
-        if (result < 0)
+        if (FAILED(result))
             return result;
         
         if (anchor == Anchor.CURRENT) {
@@ -146,11 +146,11 @@ public:
     result_t size(out long size)
     {
         result_t result = super.size(size);
-        if (result == 0) {
+        if (SUCCEEDED(result)) {
             if (supportsSeek) {
                 long pos;
                 result = seek(0, Anchor.CURRENT, pos);
-                if (result < 0) {
+                if (FAILED(result)) {
                     size += _writeBuffer.readAvailable;
                     return 0;
                 }
@@ -166,7 +166,7 @@ public:
     result_t truncate(long size)
     {
         result_t result = flush();
-        if (result < 0)
+        if (FAILED(result))
             return result;
         // TODO: truncate _readBuffer at the end
         return super.truncate(size);
@@ -175,7 +175,7 @@ public:
     result_t flush()
     out (result)
     {
-        assert(_writeBuffer.readAvailable == 0 || result < 0);
+        assert(_writeBuffer.readAvailable == 0 || FAILED(result));
     }
     body
     {
@@ -185,7 +185,7 @@ public:
             if (result < 0) {
                 return result;
             } else if (result == 0) {
-                return -1;
+                return MORDOR_E_ZEROLENGTHWRITE;
             }
             _writeBuffer.consume(result);
         }
@@ -198,24 +198,24 @@ public:
         while(true) {
             size_t readAvailable = _readBuffer.readAvailable;
             if (readAvailable >= _getDelimitedSanitySize.val) {
-                return -1;
+                return MORDOR_E_BUFFEROVERFLOW;
             }
             if (readAvailable > 0) {
                 bool success = _readBuffer.getDelimited(buf, delim);
                 if (success) {
-                    return 0;
+                    return S_OK;
                 }
             }
 
             result_t result = super.read(_readBuffer, _bufferSize);
-            if (result < 0) {
+            if (FAILED(result)) {
                 return result;
             } else if (result == 0) {
                 // EOF
                 buf.length = readAvailable;
                 _readBuffer.copyOut(buf, readAvailable);
                 _readBuffer.consume(readAvailable);
-                return 1;
+                return S_FALSE;
             }
         }
     }

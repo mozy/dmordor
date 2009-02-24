@@ -17,7 +17,7 @@ public:
     result_t read(Buffer b, size_t len)
     {
         result_t result = super.read(_buf, len);
-        if (result > 0) {
+        if (SUCCEEDED(result)) {
             foreach(buf; _buf.readBufs)
             {
                 _digest.update(buf);
@@ -31,7 +31,7 @@ public:
     result_t write(Buffer b, size_t len)
     {
         result_t result = super.write(b, len);
-        if (result > 0) {
+        if (SUCCEEDED(result)) {
             foreach(buf; _buf.readBufs)
             {
                 _digest.update(buf);
