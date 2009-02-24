@@ -189,10 +189,10 @@ public:
         assert(len == 0);
     }
     
-    void[][] readBufs(size_t len)
+    void[][] readBufs(size_t len = ~0)
     in
     {
-        assert(len <= readAvailable);
+        assert(len <= readAvailable || len == ~0);
     }
     out (result)
     {
@@ -206,6 +206,8 @@ public:
     {
         void[][] result;
         result.length = _bufs.size;
+        if (len == ~0)
+            len = readAvailable;
         size_t remaining = len;
         foreach(i, buf; _bufs)
         {
