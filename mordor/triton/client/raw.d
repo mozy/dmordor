@@ -14,6 +14,16 @@ import mordor.common.streams.transfer;
 import mordor.common.stringutils;
 
 result_t raw(BufferedStream tds, string objectName, out Stream object)
+in
+{
+    assert(tds !is null);
+    assert(tds.supportsRead);
+    assert(tds.supportsWrite);
+    assert(objectName.length > 4);
+    assert(objectName[$ - 4..$] == ".dat" || objectName[$ - 4..$] == ".man");
+    assert(objectName[$ - 4..$] == ".man" || objectName.length == 44);
+}
+body
 {
     char[] command = "raw\nb3b83038ce5abfc071828af9e24d944f\n"
         ~ objectName ~ "\n0\n";
@@ -29,6 +39,9 @@ result_t raw(BufferedStream tds, string objectName, out Stream object)
     
     char[] line;
     result = tds.getDelimited(line);
+    if (result < 0) {
+        return result;
+    }
     
     if (line.length >= 5 && line[0..5] == "ERROR") {
         throw new Exception(line);        
