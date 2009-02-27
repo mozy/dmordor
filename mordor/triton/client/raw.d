@@ -29,17 +29,17 @@ body
         ~ objectName ~ "\n0\n";
     
     result_t result = tds.write(command);
-    if (result < 0) {
+    if (FAILED(result)) {
         return result;        
     }
     result = tds.flush();
-    if (result < 0) {
+    if (FAILED(result)) {
         return result;        
     }
     
     char[] line;
     result = tds.getDelimited(line);
-    if (result < 0) {
+    if (FAILED(result)) {
         return result;
     }
     
@@ -48,7 +48,7 @@ body
     }
     long length = to!(long)(line);
     object = new LimitedStream(tds, length, false);
-    return 0;
+    return S_OK;
 }
 
 int main(string[] args)
@@ -66,12 +66,12 @@ int main(string[] args)
         Stream object;
         
         result_t result = raw(tds, args[3], object);
-        if (result != 0) {
+        if (FAILED(result)) {
             Stderr.formatln("Failed to communicate with triton: {}", result);
             return;
         }
         result = transferStream(object, stdout);
-        if (result < 0) {
+        if (FAILED(result)) {
             Stderr.formatln("Failed to read object from triton: {}", result);
             return;
         }
