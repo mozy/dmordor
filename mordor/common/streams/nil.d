@@ -20,7 +20,6 @@ public:
     bool supportsSeek() { return true; }
     bool supportsSize() { return true; }
     bool supportsTruncate() { return true; }
-    bool supportsEof() { return true; }
     
     result_t read(Buffer b, size_t len)
     {
@@ -55,11 +54,6 @@ public:
     }
     
     result_t flush()
-    {
-        return S_OK;
-    }
-    
-    result_t eof()
     {
         return S_OK;
     }

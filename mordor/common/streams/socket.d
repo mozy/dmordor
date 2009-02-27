@@ -15,7 +15,6 @@ public:
 
     bool supportsRead() { return true; }
     bool supportsWrite() { return true; }
-    bool supportsEof() { return true; }
 
     result_t close(CloseType type)
     {        
@@ -46,9 +45,6 @@ public:
     result_t read(Buffer b, size_t len)
     {
         int rc = _s.receive(b.writeBufs(len));
-        if (rc == 0) {
-            _eof = true;
-        }
         if (rc > 0) {
             b.produce(rc);
         }
@@ -59,14 +55,8 @@ public:
     {
         return RESULT_FROM_LASTERROR(_s.send(b.readBufs(len)));
     }
-    
-    result_t eof()
-    {
-        return _eof ? S_OK : S_FALSE;
-    }
 
 private:
     Socket _s;
     bool _own;
-    bool _eof;
 }

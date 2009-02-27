@@ -20,7 +20,6 @@ public:
     bool supportsSeek() { return _parent.supportsSeek; }
     bool supportsSize() { return _parent.supportsSize; }
     bool supportsTruncate() { return _parent.supportsTruncate; }
-    bool supportsEof() { return _parent.supportsEof; }
     
     result_t close(CloseType type = CloseType.BOTH)
     {
@@ -35,7 +34,6 @@ public:
     result_t size(out long size) { return _parent.size(size); }
     result_t truncate(long size) { return _parent.truncate(size); }
     result_t flush() { return _parent.flush(); }
-    result_t eof() { return _parent.eof(); }
     
 protected:
     Stream parent(Stream parent) { return _parent = parent; }
