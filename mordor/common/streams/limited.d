@@ -8,6 +8,11 @@ class LimitedStream : FilterStream
 {
 public:
     this(Stream parent, long size, bool ownsParent = true)
+    in
+    {
+        assert(size >= 0);
+    }
+    body
     {
         super(parent, ownsParent);
         _pos = 0;
