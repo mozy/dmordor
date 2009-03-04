@@ -3,17 +3,20 @@ module mordor.triton.client.raw;
 import tango.io.Stdout;
 import tango.net.InternetAddress;
 import tango.util.Convert;
+import tango.util.log.AppendConsole;
 
 import mordor.common.asyncsocket;
+import mordor.common.config;
 import mordor.common.iomanager;
-import mordor.common.streams.buffered;
+import mordor.common.log;
 import mordor.common.streams.limited;
 import mordor.common.streams.socket;
 import mordor.common.streams.std;
 import mordor.common.streams.transfer;
+import mordor.common.streams.utils;
 import mordor.common.stringutils;
 
-result_t raw(BufferedStream tds, string objectName, out Stream object)
+result_t raw(Stream tds, string objectName, out Stream object)
 in
 {
     assert(tds !is null);
@@ -29,10 +32,6 @@ body
         ~ objectName ~ "\n0\n";
     
     result_t result = tds.write(command);
-    if (FAILED(result)) {
-        return result;        
-    }
-    result = tds.flush();
     if (FAILED(result)) {
         return result;        
     }
@@ -53,7 +52,11 @@ body
 
 int main(string[] args)
 {
-    IOManager ioManager = new IOManager(2);
+    Config.loadFromEnvironment();
+    Log.root.add(new AppendConsole());
+    enableLoggers();
+
+    IOManager ioManager = new IOManager(1);
     int ret = 1;
     
     ioManager.schedule(new Fiber(delegate void() {
@@ -61,7 +64,7 @@ int main(string[] args)
         
         AsyncSocket socket = new AsyncSocket(ioManager, AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
         socket.connect(new InternetAddress(args[1], to!(int)(args[2])));
-        BufferedStream tds = new BufferedStream(new SocketStream(socket));
+        Stream tds = bufferReadStream(new SocketStream(socket));
         Stream stdout = new StdoutStream;
         Stream object;
         
