@@ -1,8 +1,16 @@
 module mordor.common.streams.socket;
 
 import tango.net.Socket;
+import tango.util.log.Log;
 
 public import mordor.common.streams.stream;
+
+private Logger _log;
+
+static this()
+{
+    _log = Log.lookup("mordor.common.streams.socket");
+}
 
 class SocketStream : Stream
 {
@@ -16,7 +24,7 @@ public:
     bool supportsRead() { return true; }
     bool supportsWrite() { return true; }
 
-    result_t close(CloseType type)
+    result_t close(CloseType type = CloseType.BOTH)
     {        
         if (_s !is null && _own) {
             SocketShutdown socketShutdown;
@@ -44,7 +52,9 @@ public:
 
     result_t read(Buffer b, size_t len)
     {
+        _log.trace("Receiving {} from socket {}", len, cast(void*)_s);
         int rc = _s.receive(b.writeBufs(len));
+        _log.trace("Received {} from socket {}", rc, cast(void*)_s);
         if (rc > 0) {
             b.produce(rc);
         }
