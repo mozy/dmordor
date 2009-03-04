@@ -1,12 +1,15 @@
 module mordor.common.streams.buffered;
 
 import tango.math.Math;
+import tango.util.log.Log;
 
 import mordor.common.config;
 public import mordor.common.streams.filter;
 
 private ConfigVar!(size_t) _defaultBufferSize;
 private ConfigVar!(size_t) _getDelimitedSanitySize;
+
+private Logger _log;
 
 static this()
 {
@@ -17,6 +20,8 @@ static this()
         Config.lookup!(size_t)("stream.buffered.getdelimitedsanitysize",
         cast(size_t)(16 * 1024 * 1024),
         "Maximum amount to buffer before failing a getDelimited call");
+    
+    _log = Log.lookup("mordor.common.streams.buffered");
 }
 
 class BufferedStream : FilterStream
@@ -45,6 +50,10 @@ public:
         b.copyIn(_readBuffer, buffered);
         _readBuffer.consume(buffered);
         remaining -= buffered;
+        
+        if (remaining == 0) {
+            return len;
+        }
 
         if (buffered == 0 || !_allowPartialReads) {
             do {
@@ -193,7 +202,7 @@ public:
         return super.flush();
     }
     
-    result_t getDelimited(out char[] buf, char delim = '\n')
+    result_t findDelimited(char delim)
     {
         while(true) {
             size_t readAvailable = _readBuffer.readAvailable;
@@ -201,9 +210,10 @@ public:
                 return MORDOR_E_BUFFEROVERFLOW;
             }
             if (readAvailable > 0) {
-                bool success = _readBuffer.getDelimited(buf, delim);
-                if (success) {
-                    return S_OK;
+                ptrdiff_t result = _readBuffer.findDelimited(delim);
+                _log.trace("Found delim '{}' on stream {} at location {}", delim, cast(void*)this, result);
+                if (result != -1) {
+                    return result;
                 }
             }
 
@@ -212,14 +222,11 @@ public:
                 return result;
             } else if (result == 0) {
                 // EOF
-                buf.length = readAvailable;
-                _readBuffer.copyOut(buf, readAvailable);
-                _readBuffer.consume(readAvailable);
-                return S_FALSE;
+                return MORDOR_E_UNEXPECTEDEOF;
             }
         }
     }
-    
+
     void unread(Buffer b, size_t len)
     {
         scope Buffer buf;

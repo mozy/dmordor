@@ -34,6 +34,7 @@ public:
     result_t size(out long size) { return _parent.size(size); }
     result_t truncate(long size) { return _parent.truncate(size); }
     result_t flush() { return _parent.flush(); }
+    result_t findDelimited(char delim) { return _parent.findDelimited(delim); }
     
 protected:
     Stream parent(Stream parent) { return _parent = parent; }

@@ -404,7 +404,7 @@ public:
         }
     }
     
-    bool getDelimited(out char[] buf, char delim, size_t len = 0)
+    ptrdiff_t findDelimited(char delim, size_t len = 0)
     in
     {
         assert(len <= readAvailable);
@@ -433,12 +433,9 @@ public:
                 break;   
         }
         if (success) {
-            buf.length = totalLength;
-            void[] voidbuf = cast(void[])buf;
-            copyOut(voidbuf, totalLength);
-            consume(totalLength + 1);
+            return totalLength + 1;
         }
-        return success;
+        return -1;
     }
 
 private:
