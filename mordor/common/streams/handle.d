@@ -35,8 +35,9 @@ public:
 		_hFile = hFile;
 		_own = ownHandle;
 	}
+    ~this() { close(); }
 	
-	result_t close(CloseType type)
+	result_t close(CloseType type = CloseType.BOTH)
 	in
 	{
 		assert(type == CloseType.BOTH);
@@ -56,6 +57,7 @@ public:
     bool supportsSeek() {
         return GetFileType(_hFile) == FILE_TYPE_DISK;
     }
+    bool supportsSize() { return supportsSeek; }    
     bool supportsTruncate() { return supportsSeek; }
 	
 	result_t read(Buffer b, size_t len)
@@ -188,6 +190,14 @@ public:
         return S_OK;
     }
     
+    result_t size(out long size)
+    {
+        BOOL ret = GetFileSizeEx(_hFile, cast(LARGE_INTEGER*)&size);
+        if (!ret)
+            return RESULT_FROM_LASTERROR();
+        return S_OK;
+    }
+
     result_t truncate(long size)
     {
         long curPos, dummy;
