@@ -8,24 +8,39 @@ import mordor.common.config;
 import mordor.common.log;
 import mordor.common.scheduler;
 import mordor.common.streams.digest;
+import mordor.common.streams.file;
 import mordor.common.streams.nil;
 import mordor.common.streams.std;
 import mordor.common.streams.transfer;
+import mordor.common.stringutils;
 
-void main()
+void main(string[] args)
 {
     Config.loadFromEnvironment();
     Log.root.add(new AppendConsole());
     enableLoggers();
-
-    Stream stdin = new StdinStream;
-    DigestStream digest = new DigestStream(stdin, new Sha0);
-    
+        
     WorkerPool pool = new WorkerPool("pool", 1);
 
     pool.schedule(new Fiber(delegate void() {
-        transferStream(digest, NilStream.get);
-        Stdout.formatln("{}", digest.hexDigest());
+        if (args.length == 1)
+            args ~= "-";
+        foreach(string arg; args[1..$]) {
+            Stream inStream;
+            if (arg == "-")
+                inStream = new StdinStream;
+            else
+                inStream = new FileStream(arg, FileStream.Flags.READ);
+
+            scope DigestStream digest = new DigestStream(inStream, new Sha0);
+
+            result_t result = transferStream(digest, NilStream.get);
+            if (FAILED(result)) {
+                Stderr.formatln("Unable to read {}", arg);
+            } else {
+                Stdout.formatln("{}  {}", digest.hexDigest(), arg);
+            }
+        }
         pool.stop();
     }));
     pool.start(true);
