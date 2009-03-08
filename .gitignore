@@ -2,3 +2,4 @@ dsss.last
 dsss_objs
 bin
 *.DS_Store
+*.map
