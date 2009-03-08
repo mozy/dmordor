@@ -2,8 +2,13 @@ Install MacPorts (or manually install the following software): http://www.macpor
 
 sudo port install git-core
 sudo port install mercurial
-sudo port install llvm
 sudo port install cmake
+
+Download and extract http://llvm.org/releases/2.5/llvm-2.5.tar.gz
+
+./configure --enable-optimized
+make
+sudo make install
 
 Pick your source directory, go there
 
@@ -11,7 +16,7 @@ git clone ssh://icarus.dechocorp.com/var/lib/git/mordor.git mordor
 hg clone http://hg.dsource.org/projects/ldc ldc
 svn co http://svn.dsource.org/projects/tango/trunk ldc/tango
 cd ldc/tango
-for $F in ../../mordor/patches/tango/*; do patch -p0 < $F; done
+cat ../../mordor/patches/tango/* | patch -p0
 cd ..
 ccmake ./
 <press c>
@@ -19,14 +24,13 @@ ccmake ./
 <press g>
 make
 make runtime
-
-Add ldc/bin to your $PATH (probably in your .bashrc).
+sudo make install
 
 Install dsss: http://dsource.org/projects/dsss
 
-sudo ln -s <pathtoldc>/ldc-tango /usr/etc/rebuild/ldc-tango
+sudo cp <pathtoldc>/ldc-posix-tango /usr/etc/rebuild
 
-Edit /usr/etc/rebuild/default to be profile=ldc-tango
+Edit /usr/etc/rebuild/default to be profile=ldc-posix-tango
 
 Go to your mordor checkout, and run dsss build
 
