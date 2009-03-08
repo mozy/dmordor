@@ -4,7 +4,9 @@ public import mordor.common.streams.stream;
 
 version (Windows) {
     import win32.winbase;
+    import win32.winnt;
 	
+    import mordor.common.exception;
 	import mordor.common.streams.handle;
 	
 	private alias HandleStream NativeStream;
@@ -21,7 +23,12 @@ class StdinStream : NativeStream
 public:
 	this() {
 		version (Windows) {
-			super(GetStdHandle(STD_INPUT_HANDLE), true);
+            HANDLE hStdIn = GetStdHandle(STD_INPUT_HANDLE);
+            if (hStdIn == INVALID_HANDLE_VALUE)
+                throw exceptionFromLastError();
+            if (hStdIn == NULL)
+                throw exceptionFromLastError(ERROR_FILE_NOT_FOUND);
+			super(hStdIn, true);
 		} else version (Posix) {
 			super(STDIN_FILENO, false);
 		}
@@ -29,7 +36,7 @@ public:
 	
 	bool supportsWrite() { return false; }
 	
-	result_t write() { assert(false); return E_NOTIMPL; }
+	size_t write() { assert(false); }
 }
 
 class StdoutStream : NativeStream
@@ -37,7 +44,12 @@ class StdoutStream : NativeStream
 public:
 	this() {
 		version (Windows) {
-			super(GetStdHandle(STD_OUTPUT_HANDLE), true);
+            HANDLE hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
+            if (hStdOut == INVALID_HANDLE_VALUE)
+                throw exceptionFromLastError();
+            if (hStdOut == NULL)
+                throw exceptionFromLastError(ERROR_FILE_NOT_FOUND);
+            super(hStdOut, true);
 		} else version (Posix) {
 			super(STDOUT_FILENO, false);
 		}
@@ -45,7 +57,7 @@ public:
 	
 	bool supportsRead() { return false; }
 	
-	result_t read() { assert(false); return E_NOTIMPL; }
+	size_t read() { assert(false); }
 }
 
 class StderrStream : NativeStream
@@ -53,7 +65,12 @@ class StderrStream : NativeStream
 public:
 	this() {
 		version (Windows) {
-			super(GetStdHandle(STD_ERROR_HANDLE), true);
+            HANDLE hStdErr = GetStdHandle(STD_ERROR_HANDLE);
+            if (hStdErr == INVALID_HANDLE_VALUE)
+                throw exceptionFromLastError();
+            if (hStdErr == NULL)
+                throw exceptionFromLastError(ERROR_FILE_NOT_FOUND);
+            super(hStdErr, true);
 		} else version (Posix) {
 			super(STDERR_FILENO, false);
 		}
@@ -61,5 +78,5 @@ public:
 	
 	bool supportsRead() { return false; }
 	
-	result_t read() { assert(false); return E_NOTIMPL; }
+	size_t read() { assert(false); }
 }

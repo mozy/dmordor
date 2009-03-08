@@ -18,15 +18,9 @@ void main(char[][] args)
         Buffer sendBuf = new Buffer(), receiveBuf = new Buffer();
         scope SocketStream stream = new SocketStream(s);
         sendBuf.copyIn("hello\r\n");
-        result_t result = stream.write(sendBuf, sendBuf.readAvailable);
-        if (FAILED(result) || result == 0) {
-            return;
-        }
-        result = stream.read(receiveBuf, 8192);
-        if (FAILED(result)) {
-            return;
-        }
-        Stdout.formatln("Read {} bytes from conn", result);
+        stream.write(sendBuf, sendBuf.readAvailable);
+        size_t read = stream.read(receiveBuf, 8192);
+        Stdout.formatln("Read {} bytes from conn", read);
         ioManager.stop();
     }));
 

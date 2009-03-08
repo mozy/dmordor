@@ -23,7 +23,7 @@ static this()
     _log = Log.lookup("triton.client.store");
 }
 
-result_t store(Stream tds, string objectName, Stream object)
+void store(Stream tds, string objectName, Stream object)
 in
 {
     assert(tds !is null);
@@ -41,31 +41,16 @@ body
         ~ objectName ~ "\n0\n";
 
     _log.trace("Storing object {}", objectName);
-    long size;
-    result_t result = object.size(size);
-    if (FAILED(result)) {
-        _log.error("Unable to store object {} because we couldn't get size: {}", objectName, result);
-        return result;
-    }
+    long size = object.size();
     
     command ~= to!(string)(size) ~ "\n";
     
-    result = tds.write(command);
-    if (FAILED(result)) {
-        return result;
-    }
-    result = transferStream(object, tds);
-    if (FAILED(result)) {
-        return result;
-    }
+    tds.write(command);
+    transferStream(object, tds);
     
     _log.trace("stored object {}", objectName);
     char[] line;
-    result = tds.getDelimited(line);
-    if (FAILED(result)) {
-        _log.error("Unable to get response for store of object {}: {}", objectName, result);
-        return result;
-    }
+    tds.getDelimited(line);
     _log.trace("Got response '{}' from triton", line);
     
     if (line.length != 2 || line != "OK") {
@@ -91,11 +76,7 @@ int main(string[] args)
         Stream tds = bufferReadStream(new SocketStream(socket));
         Stream object = new FileStream(args[3]);
         
-        result_t result = store(tds, args[4], object);
-        if (FAILED(result)) {
-            Stderr.formatln("Failed to communicate with triton: {}", result);
-            return;
-        }
+        store(tds, args[4], object);
         
         ret = 0;
     }));

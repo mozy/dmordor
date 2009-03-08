@@ -4,6 +4,7 @@ import tango.math.Math;
 import tango.util.log.Log;
 
 import mordor.common.config;
+import mordor.common.exception;
 import mordor.common.scheduler;
 import mordor.common.streams.stream;
 
@@ -18,8 +19,7 @@ static this()
     _log = Log.lookup("mordor.common.streams.transfer");
 }
 
-result_t transferStream(Stream src, Stream dst, long toTransfer, out long totalRead, out long totalWritten,
-                        out result_t readResult, out result_t writeResult)
+void transferStream(Stream src, Stream dst, long toTransfer, out long totalRead, out long totalWritten)
 in
 {
     assert(src !is null);
@@ -34,43 +34,51 @@ body
     Buffer* readBuffer, writeBuffer;
     size_t chunkSize = _chunkSize.val;
     size_t todo;
+    size_t readResult, writeResult;
+    Exception readException, writeException;
     
     void read()
     {
         todo = chunkSize;
         if (toTransfer != -1L && toTransfer - totalRead < todo)
             todo = toTransfer;
-        readResult = src.read(*readBuffer, todo);
-        if (SUCCEEDED(readResult)) {
-            totalRead += readResult;
+        try {
+            totalRead += readResult = src.read(*readBuffer, todo);
+        } catch (Exception ex) {
+            readException = ex;
         }
     }
     
     void write()
     {
         while(writeBuffer.readAvailable > 0) {
-            writeResult = dst.write(*writeBuffer, writeBuffer.readAvailable);
-            if (writeResult == 0)
-                writeResult = MORDOR_E_ZEROLENGTHWRITE;
-            if (FAILED(writeResult))
-                break;
-            writeBuffer.consume(writeResult);
-            totalWritten += writeResult;
+            try {
+                 writeResult = dst.write(*writeBuffer, writeBuffer.readAvailable);
+                 writeBuffer.consume(writeResult);
+                 totalWritten += writeResult;
+            } catch (Exception ex) {
+                writeException = ex;
+            }
         }
+    }
+    
+    void throwException()
+    {
+        if (readException !is null || writeException !is null)
+            throw new StreamTransferException(readException, writeException);
     }
     
     _log.trace("Transferring from {} to {}, limit {}", cast(void*)src,
         cast(void*)dst, toTransfer);        
     readBuffer = &buf1;
     read();
+    throwException();
     _log.trace("Read {} from {}", readResult, cast(void*)src);
     if (readResult == 0 && toTransfer != -1L)
-        return MORDOR_E_UNEXPECTEDEOF;
-    if (FAILED(readResult))
-        return MORDOR_E_READFAILURE;
+        throw new UnexpectedEofException();
     if (readResult == 0)
-        return S_OK;
-    
+        return;
+
     while (totalRead < toTransfer  || toTransfer == -1L) {
         writeBuffer = readBuffer;
         if (readBuffer == &buf1)
@@ -78,54 +86,35 @@ body
         else
             readBuffer = &buf1;
         parallel_do(&read, &write);
+        throwException();
         _log.trace("Read {} from {}; wrote {} to {}; {}/{} total read/written",
             readResult, cast(void*)src, writeResult, cast(void*)dst, totalRead, totalWritten);
         if (readResult == 0 && toTransfer != -1L)
-            return MORDOR_E_UNEXPECTEDEOF;
-        if (FAILED(readResult))
-            return MORDOR_E_READFAILURE;
-        if (FAILED(writeResult))
-            return MORDOR_E_WRITEFAILURE;
+            throw new UnexpectedEofException();
         if (readResult == 0)
-            return S_OK;
+            return;
     }
     writeBuffer = readBuffer;
     write();
+    throwException();
     _log.trace("Wrote {} to {}; {}/{} total read/written", writeResult,
         cast(void*)dst, totalRead, totalWritten);
-    if (FAILED(writeResult))
-        return MORDOR_E_WRITEFAILURE;
-    return S_OK;
 }
 
-result_t transferStream(Stream src, Stream dst)
+void transferStream(Stream src, Stream dst)
 {
     long totalRead, totalWritten;
-    result_t readResult, writeResult;
-    return transferStream(src, dst, -1L, totalRead, totalWritten, readResult, writeResult);
+    return transferStream(src, dst, -1L, totalRead, totalWritten);
 }
 
-result_t transferStream(Stream src, Stream dst, long toTransfer)
+void transferStream(Stream src, Stream dst, long toTransfer)
 {
     long totalRead, totalWritten;
-    result_t readResult, writeResult;
-    return transferStream(src, dst, toTransfer, totalRead, totalWritten, readResult, writeResult);
+    return transferStream(src, dst, toTransfer, totalRead, totalWritten);
 }
 
-result_t transferStream(Stream src, Stream dst, out long totalRead, out long totalWritten)
+void transferStream(Stream src, Stream dst, out long totalRead, out long totalWritten)
 {
-    result_t readResult, writeResult;
-    return transferStream(src, dst, -1L, totalRead, totalWritten, readResult, writeResult);
+    return transferStream(src, dst, -1L, totalRead, totalWritten);
 }
 
-result_t transferStream(Stream src, Stream dst, long toTransfer, out long totalRead, out long totalWritten)
-{
-    result_t readResult, writeResult;
-    return transferStream(src, dst, toTransfer, totalRead, totalWritten, readResult, writeResult);
-}
-
-result_t transferStream(Stream src, Stream dst, out long totalRead, out long totalWritten,
-                        out result_t readResult, out result_t writeResult)
-{
-    return transferStream(src, dst, -1L, totalRead, totalWritten, readResult, writeResult);
-}

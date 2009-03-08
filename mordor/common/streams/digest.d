@@ -14,31 +14,27 @@ public:
         _digest = digest;
     }
     
-    result_t read(Buffer b, size_t len)
+    size_t read(Buffer b, size_t len)
     {
-        result_t result = super.read(_buf, len);
-        if (SUCCEEDED(result)) {
-            foreach(buf; _buf.readBufs)
-            {
-                _digest.update(buf);
-            }
-            b.copyIn(_buf, result);
-            _buf.clear();            
+        size_t result = super.read(_buf, len);
+        foreach(buf; _buf.readBufs)
+        {
+            _digest.update(buf);
         }
+        b.copyIn(_buf, result);
+        _buf.clear();            
         return result;
     }
     
-    result_t write(Buffer b, size_t len)
+    size_t write(Buffer b, size_t len)
     {
-        result_t result = super.write(b, len);
-        if (SUCCEEDED(result)) {
-            foreach(buf; _buf.readBufs)
-            {
-                _digest.update(buf);
-            }
-            b.copyIn(_buf, result);
-            _buf.clear();            
+        size_t result = super.write(b, len);
+        foreach(buf; _buf.readBufs)
+        {
+            _digest.update(buf);
         }
+        b.copyIn(_buf, result);
+        _buf.clear();            
         return result;
     }
     

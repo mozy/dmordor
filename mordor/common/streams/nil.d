@@ -21,42 +21,36 @@ public:
     bool supportsSize() { return true; }
     bool supportsTruncate() { return true; }
     
-    result_t read(Buffer b, size_t len)
+    size_t read(Buffer b, size_t len)
     {
         return 0;
     }
     
-    result_t write(Buffer b, size_t len)
+    size_t write(Buffer b, size_t len)
     {
         return len;
     }
     
-    result_t write(void[] b)
+    size_t write(void[] b)
     {
         return b.length;
     }
     
-    result_t seek(long offset, Anchor anchor, out long pos)
+    long seek(long offset, Anchor anchor)
     {
-        pos = 0;
-        return S_OK;
+        return 0;
     }
     
-    result_t size(out long size)
+    long size()
     {
-        size = 0;
-        return S_OK;
+        return 0;
     }
     
-    result_t truncate()
-    {
-        return S_OK;
-    }
+    void truncate(long size)
+    {}
     
-    result_t flush()
-    {
-        return S_OK;
-    }
+    void flush()
+    {}
     
 private:
     static NilStream _singleton;

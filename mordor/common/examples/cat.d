@@ -31,10 +31,7 @@ void main(string[] args)
             else
                 inStream = new FileStream(arg, FileStream.Flags.READ);
 
-            result_t result = transferStream(inStream, stdout);
-            if (FAILED(result)) {
-                Stderr.formatln("Unable to read {}", arg);
-            }
+            transferStream(inStream, stdout);
         }
         pool.stop();
     }));

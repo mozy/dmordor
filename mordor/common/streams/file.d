@@ -2,6 +2,7 @@ module mordor.common.streams.file;
 
 import tango.stdc.stringz;
 
+import mordor.common.exception;
 public import mordor.common.streams.stream;
 import mordor.common.stringutils;
 
@@ -61,7 +62,7 @@ public:
                 NULL,
                 cast(DWORD)createFlags,
                 0,
-                NULL);            
+                NULL);
         } else version (Posix) {
             int oflags = cast(int)flags;
             switch (createFlags) {
@@ -81,6 +82,9 @@ public:
                     break;
             }
             handle = open(toStringz(filename), oflags, 0777);            
+        }
+        if (handle == cast(NativeHandle)-1) {
+            throw exceptionFromLastError();
         }
         super(handle);
     }

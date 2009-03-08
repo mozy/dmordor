@@ -4,6 +4,7 @@ import tango.stdc.posix.unistd;
 import tango.stdc.posix.sys.stat;
 import tango.stdc.posix.sys.uio;
 
+import mordor.common.exception;
 public import mordor.common.streams.stream;
 
 class FDStream : Stream
@@ -16,7 +17,7 @@ public:
     }
     ~this() { close(); } 
     
-    result_t close(CloseType type = CloseType.BOTH)
+    void close(CloseType type = CloseType.BOTH)
     in
     {
         assert(type == CloseType.BOTH);
@@ -24,10 +25,11 @@ public:
     body
     {
         if (_fd != 0 && _own) {
-            .close(_fd);
-            _fd = 0;
+            if (.close(_fd) == -1) {
+                throw exceptionFromLastError();
+            }
+            _fd = 0;            
         }
-        return S_OK;
     }
     
     bool supportsRead() { return true; }
@@ -36,36 +38,45 @@ public:
     bool supportsSize() { return true; }
     bool supportsTruncate() { return true; }
     
-    result_t read(Buffer b, size_t len)
+    size_t read(Buffer b, size_t len)
     {
         iovec[] iov = makeIovec(b.writeBufs(len));
         int rc = readv(_fd, iov.ptr, iov.length);
-        if (rc > 0) {
-            b.produce(rc);
+        if (rc < 0) {
+            throw exceptionFromLastError();
         }
-        return RESULT_FROM_LASTERROR(rc);
+        b.produce(rc);
+        return rc;
     }
     
-    result_t write(Buffer b, size_t len)
+    size_t write(Buffer b, size_t len)
     {
         iovec[] iov = makeIovec(b.readBufs(len));
-        return RESULT_FROM_LASTERROR(writev(_fd, iov.ptr, iov.length));
+        int rc = writev(_fd, iov.ptr, iov.length);
+        if (rc == 0) {
+            throw new ZeroLengthWriteException();
+        }
+        if (rc < 0) {
+            throw exceptionFromLastError();
+        }
+        return rc;
     }
     
-    result_t seek(long offset, Anchor anchor, out long pos)
+    long seek(long offset, Anchor anchor)
     {
-        pos = lseek(_fd, offset, cast(int)anchor);
-        if (pos == -1)
-            return RESULT_FROM_LASTERROR();
-        return S_OK;
+        long pos = lseek(_fd, offset, cast(int)anchor);
+        if (pos < 0)
+            throw exceptionFromLastError();
+        return pos;
     }
     
-    result_t size(out long size)
+    long size()
     {
         stat_t statbuf;
         int rc = fstat(_fd, &statbuf);
-        size = statbuf.st_size;
-        return RESULT_FROM_LASTERROR(rc);
+        if (rc != 0)
+            throw exceptionFromLastError();
+        return statbuf.st_size;
     }
     
     protected static iovec[] makeIovec(void[][] bufs)

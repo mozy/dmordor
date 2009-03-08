@@ -4,13 +4,9 @@ import tango.util.log.Log;
 import win32.winbase;
 import win32.winnt;
 
+import mordor.common.exception;
 import mordor.common.iomanager;
 public import mordor.common.streams.stream;
-
-alias mordor.common.result.E_NOTIMPL E_NOTIMPL;
-alias mordor.common.result.E_INVALIDARG E_INVALIDARG;
-alias mordor.common.result.S_OK S_OK;
-alias mordor.common.result.FAILED FAILED;
 
 class HandleStream : Stream
 {
@@ -21,6 +17,12 @@ public:
     }
 
 	this(HANDLE hFile, bool ownHandle = true)
+    in
+    {
+        assert(hFile != NULL);
+        assert(hFile != INVALID_HANDLE_VALUE);
+    }
+    body
 	{
         _log.trace("Creating HandleStream on handle {}", hFile);
 		_hFile = hFile;
@@ -28,6 +30,12 @@ public:
 	}
 	
 	this(IOManager ioManager, HANDLE hFile, bool ownHandle = true)
+    in
+    {
+        assert(hFile != NULL);
+        assert(hFile != INVALID_HANDLE_VALUE);
+    }
+    body
 	{
         _log.trace("Creating HandleStream on handle {} using scheduler {}",
             hFile, ioManager.name);
@@ -37,7 +45,7 @@ public:
 	}
     ~this() { close(); }
 	
-	result_t close(CloseType type = CloseType.BOTH)
+	void close(CloseType type = CloseType.BOTH)
 	in
 	{
 		assert(type == CloseType.BOTH);
@@ -46,7 +54,9 @@ public:
 	{
 		if (_hFile != INVALID_HANDLE_VALUE && _own) {
             _log.trace("Closing handle {}", _hFile);
-			CloseHandle(_hFile);
+			if (!CloseHandle(_hFile)) {
+                throw exceptionFromLastError();         
+            }
 			_hFile = INVALID_HANDLE_VALUE;
 		}
 		return S_OK;
@@ -60,7 +70,7 @@ public:
     bool supportsSize() { return supportsSeek; }    
     bool supportsTruncate() { return supportsSeek; }
 	
-	result_t read(Buffer b, size_t len)
+	size_t read(Buffer b, size_t len)
 	{
         DWORD read;
         OVERLAPPED* overlapped;
@@ -82,7 +92,7 @@ public:
             }
             if (!ret && GetLastError() != ERROR_IO_PENDING) {
                 _log.trace("Read from handle {} failed with code {}", _hFile, GetLastError());
-                return RESULT_FROM_LASTERROR();
+                throw exceptionFromLastError();
             }
             Fiber.yield();
             if (!_readEvent.ret && (_readEvent.lastError == ERROR_HANDLE_EOF ||
@@ -92,7 +102,7 @@ public:
             if (!_readEvent.ret) {
                 _log.trace("Async read from handle {} failed with code {}", _hFile,
                     _readEvent.lastError);
-                return RESULT_FROM_WIN32(_readEvent.lastError);
+                throw exceptionFromLastError(_readEvent.lastError);
             }
             if (supportsSeek) {
                 _pos = (cast(long)overlapped.Offset | (cast(long)overlapped.OffsetHigh << 32)) +
@@ -107,14 +117,14 @@ public:
         }
         if (!ret) {
             _log.trace("Sync read from handle {} failed with code {}", _hFile, GetLastError());
-            return RESULT_FROM_LASTERROR();
+            throw exceptionFromLastError();
         }
         _log.trace("Read {} bytes from handle {}", read, _hFile);
         b.produce(read);
 		return read;
 	}
 	
-	result_t write(Buffer b, size_t len)
+	size_t write(Buffer b, size_t len)
 	{
         DWORD written;
         OVERLAPPED* overlapped;
@@ -132,12 +142,12 @@ public:
         if (_ioManager !is null) {
             if (!ret && GetLastError() != ERROR_IO_PENDING) {
                 _log.trace("Write to handle {} failed with code {}", _hFile, GetLastError());
-                return RESULT_FROM_LASTERROR();
+                throw exceptionFromLastError();
             }
             Fiber.yield();
             if (!_writeEvent.ret) {
                 _log.trace("Async write to handle {} failed with code {}", _hFile, _writeEvent.lastError);
-                return RESULT_FROM_WIN32(_writeEvent.lastError);
+                throw exceptionFromLastError(_writeEvent.lastError);
             }
             if (supportsSeek) {
                 _pos = (cast(long)overlapped.Offset | (cast(long)overlapped.OffsetHigh << 32)) +
@@ -148,73 +158,62 @@ public:
         }
         if (!ret) {
             _log.trace("Sync write to handle {} failed with code {}", _hFile, GetLastError());
-            return RESULT_FROM_LASTERROR();
+            throw exceptionFromLastError();
         }
         _log.trace("Wrote {} bytes to handle {}", written, _hFile);
 		return written;
 	}
 
-    result_t seek(long offset, Anchor anchor, out long pos)
+    long seek(long offset, Anchor anchor)
     {
         if (_ioManager !is null) {
             if (supportsSeek) {
                 switch (anchor) {
                     case Anchor.BEGIN:
                         if (offset < 0)
-                            return E_INVALIDARG;
-                        pos = _pos = offset;
-                        return S_OK;
+                            throw new IllegalArgumentException("offset");
+                        return _pos = offset;
                     case Anchor.CURRENT:
                         if (_pos + offset < 0)
-                            return E_INVALIDARG;
-                        pos = _pos = _pos + offset;
-                        return S_OK;
+                            throw new IllegalArgumentException("offset");
+                        return _pos = _pos + offset;
                     case Anchor.END:
-                        result_t result = size(pos);
-                        if (result != 0)
-                            return result;
-                        if (pos + offset < 0)
-                            return E_INVALIDARG;
-                        pos = _pos = pos + offset;
-                        return S_OK;                    
+                        long end = size();
+                        if (end + offset < 0)
+                            throw new IllegalArgumentException("offset");
+                        return _pos = end + offset;
                 }
             } else {
-                return E_NOTIMPL;
+                assert(false);
             }
         }
         
+        long pos;
         BOOL ret = SetFilePointerEx(_hFile, *cast(LARGE_INTEGER*)&offset,
             cast(LARGE_INTEGER*)&pos, cast(DWORD)anchor);
         if (!ret)
-            return RESULT_FROM_LASTERROR();
-        return S_OK;
+            throw exceptionFromLastError();
+        return pos;
     }
     
-    result_t size(out long size)
+    long size()
     {
+        long size;
         BOOL ret = GetFileSizeEx(_hFile, cast(LARGE_INTEGER*)&size);
         if (!ret)
-            return RESULT_FROM_LASTERROR();
-        return S_OK;
+            throw exceptionFromLastError();
+        return size;
     }
 
-    result_t truncate(long size)
+    void truncate(long size)
     {
-        long curPos, dummy;
-        result_t result = seek(0, Anchor.CURRENT, curPos);
-        if (FAILED(result))
-            return result;
-        result = seek(size, Anchor.BEGIN, dummy);
-        if (FAILED(result))
-            return result;
+        long pos = seek(0, Anchor.CURRENT);
+        seek(size, Anchor.BEGIN);
         BOOL ret = SetEndOfFile(_hFile);
         DWORD lastError = GetLastError();
-        result = seek(curPos, Anchor.BEGIN, dummy);
-        if (FAILED(result))
-            return result;
+        seek(pos, Anchor.BEGIN);
         if (!ret)
-            return RESULT_FROM_WIN32(lastError);
-        return S_OK;
+            throw exceptionFromLastError(lastError);
     }
 	
 private:

@@ -4,6 +4,7 @@ import tango.math.Math;
 import tango.util.log.Log;
 
 import mordor.common.config;
+import mordor.common.exception;
 public import mordor.common.streams.filter;
 
 private ConfigVar!(size_t) _defaultBufferSize;
@@ -42,7 +43,7 @@ public:
     bool allowPartialReads() { return _allowPartialReads; }
     bool allowPartialReads(bool allowPartialReads) { return _allowPartialReads = allowPartialReads; }
 
-    result_t read(Buffer b, size_t len)
+    size_t read(Buffer b, size_t len)
     {
         size_t remaining = len;
 
@@ -59,10 +60,12 @@ public:
             do {
                 // Read enough to satisfy this request, plus up to a multiple of the buffer size 
                 size_t todo = ((remaining - 1) / _bufferSize + 1) * _bufferSize;
-                result_t result = super.read(_readBuffer, todo);
-                if (result <= 0) {
+                size_t result;
+                try {
+                    result = super.read(_readBuffer, todo);
+                } catch(PlatformException ex){
                     if (remaining == len) {
-                        return result;
+                        throw ex;
                     } else {
                         return len - remaining;
                     }
@@ -78,11 +81,11 @@ public:
         return len - remaining;
     }
 
-    result_t write(Buffer b, size_t len)
+    size_t write(Buffer b, size_t len)
     out (result)
     {
         // Partial writes not allowed
-        assert(result == len || result < 0);
+        assert(result == len);
     }
     body
     {
@@ -90,11 +93,11 @@ public:
         return flushWrite(len);
     }
 
-    result_t write(void[] b)
+    size_t write(void[] b)
     out (result)
     {
         // Partial writes not allowed
-        assert(result == b.length || result <= 0);
+        assert(result == b.length);
     }
     body
     {
@@ -103,12 +106,14 @@ public:
         return flushWrite(b.length);        
     }
     
-    private result_t flushWrite(size_t len)
+    private size_t flushWrite(size_t len)
     {
         while(_writeBuffer.readAvailable > _bufferSize)
         {
-            result_t result = super.write(_writeBuffer, _writeBuffer.readAvailable);
-            if (result <= 0) {
+            size_t result;
+            try {
+                result = super.write(_writeBuffer, _writeBuffer.readAvailable);
+            } catch (PlatformException ex) {
                 // If this entire write is still in our buffer,
                 // back it out, and report an error
                 if (_writeBuffer.readAvailable >= len) {
@@ -116,7 +121,7 @@ public:
                     tempBuffer.copyIn(_writeBuffer, _writeBuffer.readAvailable - len);
                     _writeBuffer.clear();
                     _writeBuffer.copyIn(tempBuffer);
-                    return result;
+                    throw ex;
                 } else {
                     // Otherwise we have to say we succeeded,
                     // because we're not allowed to have a partial
@@ -125,89 +130,80 @@ public:
                     // the entire write
                     return len;
                 }
-            } else {
-                _writeBuffer.consume(result);
             }
+            
+            _writeBuffer.consume(result);
         }
         return len;
     }
 
-    result_t seek(long offset, Anchor anchor, out long pos)
+    long seek(long offset, Anchor anchor)
     out (result)
     {
-        assert(FAILED(result) || _readBuffer.readAvailable == 0);
-        assert(FAILED(result) || _writeBuffer.readAvailable == 0);
+        assert(_readBuffer.readAvailable == 0);
+        assert(_writeBuffer.readAvailable == 0);
     }
     body
     {
-        result_t result = flush();
-        if (FAILED(result))
-            return result;
-        
+        flush(); 
         if (anchor == Anchor.CURRENT) {
             // adjust for the buffer having modified the actual stream position
             offset -= _readBuffer.readAvailable;
         }
         _readBuffer.clear();
-        return super.seek(offset, anchor, pos);
+        return super.seek(offset, anchor);
     }
     
-    result_t size(out long size)
+    long size()
     {
-        result_t result = super.size(size);
-        if (SUCCEEDED(result)) {
-            if (supportsSeek) {
-                long pos;
-                result = seek(0, Anchor.CURRENT, pos);
-                if (FAILED(result)) {
-                    size += _writeBuffer.readAvailable;
-                    return 0;
-                }
-                size = max(pos + _writeBuffer.readAvailable, size);
-            } else {
-                // not a seekable stream; we can only write to the end
-                size += _writeBuffer.readAvailable;
+        long size = super.size();
+        if (supportsSeek) {
+            long pos;
+            try {
+                pos = seek(0, Anchor.CURRENT);
+            } catch (PlatformException ex) {
+                return size + _writeBuffer.readAvailable;
             }
+            size = max(pos + _writeBuffer.readAvailable, size);
+        } else {
+            // not a seekable stream; we can only write to the end
+            size += _writeBuffer.readAvailable;
         }
-        return result;
+        return size;
     }
     
-    result_t truncate(long size)
+    void truncate(long size)
     {
-        result_t result = flush();
-        if (FAILED(result))
-            return result;
+        flush();
         // TODO: truncate _readBuffer at the end
-        return super.truncate(size);
+        super.truncate(size);
     }
     
-    result_t flush()
-    out (result)
+    void flush()
+    out
     {
-        assert(_writeBuffer.readAvailable == 0 || FAILED(result));
+        assert(_writeBuffer.readAvailable == 0);
     }
     body
     {
         while (_writeBuffer.readAvailable)
         {
-            result_t result = super.write(_writeBuffer, _writeBuffer.readAvailable);
-            if (result < 0) {
-                return result;
-            } else if (result == 0) {
-                return MORDOR_E_ZEROLENGTHWRITE;
+            size_t result = super.write(_writeBuffer, _writeBuffer.readAvailable);
+            if (result == 0) {
+                // TODO: throw MORDOR_E_ZEROLENGTHWRITE;
             }
             _writeBuffer.consume(result);
         }
         
-        return super.flush();
+        super.flush();
     }
     
-    result_t findDelimited(char delim)
+    size_t findDelimited(char delim)
     {
         while(true) {
             size_t readAvailable = _readBuffer.readAvailable;
             if (readAvailable >= _getDelimitedSanitySize.val) {
-                return MORDOR_E_BUFFEROVERFLOW;
+                throw new BufferOverflowException;
             }
             if (readAvailable > 0) {
                 ptrdiff_t result = _readBuffer.findDelimited(delim);
@@ -217,12 +213,10 @@ public:
                 }
             }
 
-            result_t result = super.read(_readBuffer, _bufferSize);
-            if (FAILED(result)) {
-                return result;
-            } else if (result == 0) {
+            size_t result = super.read(_readBuffer, _bufferSize);
+            if (result == 0) {
                 // EOF
-                return MORDOR_E_UNEXPECTEDEOF;
+                throw new UnexpectedEofException();
             }
         }
     }

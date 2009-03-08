@@ -34,12 +34,8 @@ void main(string[] args)
 
             scope DigestStream digest = new DigestStream(inStream, new Sha0);
 
-            result_t result = transferStream(digest, NilStream.get);
-            if (FAILED(result)) {
-                Stderr.formatln("Unable to read {}", arg);
-            } else {
-                Stdout.formatln("{}  {}", digest.hexDigest(), arg);
-            }
+            transferStream(digest, NilStream.get);
+            Stdout.formatln("{}  {}", digest.hexDigest(), arg);
         }
         pool.stop();
     }));

@@ -29,47 +29,51 @@ public:
     bool supportsWrite() { return _type == Type.WRITE; }
     bool supportsTruncate() { return _type == Type.WRITE && super.supportsTruncate; }
     
-    result_t read(Buffer b, size_t len)
+    size_t read(Buffer b, size_t len)
+    in
     {
-        if (_type == Type.WRITE) {
-            assert(_type == Type.READ);
-            return E_NOTIMPL;
-        }
+        assert(_type == Type.READ);
+    }
+    body
+    {
         return super.read(b, len);  
     }
     
-    result_t write(Buffer b, size_t len)
+    size_t write(Buffer b, size_t len)
+    in
     {
-        if (_type == Type.READ) {
-            assert(_type == Type.WRITE);
-            return E_NOTIMPL;
-        }
+        assert(_type == Type.WRITE);
+    }
+    body
+    {
         return super.write(b, len);
     }
     
-    result_t truncate(long size)
+    void truncate(long size)
+    in
     {
-        if (_type == Type.READ) {
-            assert(_type == Type.WRITE);
-            return E_NOTIMPL;
-        }
+        assert(_type == Type.WRITE);
+    }
+    body
+    {
         return super.truncate(size);
     }
     
-    result_t flush()
+    void flush()
     {
         if (_type == Type.READ) {
-            return S_OK;
+            return;
         }
-        return super.flush();
+        super.flush();
     }
     
-    result_t findDelimited(char delim)
+    size_t findDelimited(char delim)
+    in
     {
-        if (_type == Type.WRITE) {
-            assert(_type == Type.READ);
-            return E_NOTIMPL;
-        }
+        assert(_type == Type.READ);
+    }
+    body
+    {
         return super.findDelimited(delim);
     }
 

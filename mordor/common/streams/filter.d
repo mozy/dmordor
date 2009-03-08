@@ -21,20 +21,18 @@ public:
     bool supportsSize() { return _parent.supportsSize; }
     bool supportsTruncate() { return _parent.supportsTruncate; }
     
-    result_t close(CloseType type = CloseType.BOTH)
+    void close(CloseType type = CloseType.BOTH)
     {
         if (ownsParent)
-            return _parent.close(type);
-        else
-            return S_OK;
+            _parent.close(type);
     }
-    result_t read(Buffer b, size_t len) { return _parent.read(b, len); }
-    result_t write(Buffer b, size_t len) { return _parent.write(b, len); }
-    result_t seek(long offset, Anchor anchor, out long pos) { return _parent.seek(offset, anchor, pos); }
-    result_t size(out long size) { return _parent.size(size); }
-    result_t truncate(long size) { return _parent.truncate(size); }
-    result_t flush() { return _parent.flush(); }
-    result_t findDelimited(char delim) { return _parent.findDelimited(delim); }
+    size_t read(Buffer b, size_t len) { return _parent.read(b, len); }
+    size_t write(Buffer b, size_t len) { return _parent.write(b, len); }
+    long seek(long offset, Anchor anchor) { return _parent.seek(offset, anchor); }
+    long size() { return _parent.size(); }
+    void truncate(long size) { _parent.truncate(size); }
+    void flush() { _parent.flush(); }
+    size_t findDelimited(char delim) { return _parent.findDelimited(delim); }
     
 protected:
     Stream parent(Stream parent) { return _parent = parent; }

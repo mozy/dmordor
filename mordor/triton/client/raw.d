@@ -16,7 +16,7 @@ import mordor.common.streams.transfer;
 import mordor.common.streams.utils;
 import mordor.common.stringutils;
 
-result_t raw(Stream tds, string objectName, out Stream object)
+Stream raw(Stream tds, string objectName)
 in
 {
     assert(tds !is null);
@@ -31,23 +31,16 @@ body
     char[] command = "raw\nb3b83038ce5abfc071828af9e24d944f\n"
         ~ objectName ~ "\n0\n";
     
-    result_t result = tds.write(command);
-    if (FAILED(result)) {
-        return result;        
-    }
+    tds.write(command);
     
     char[] line;
-    result = tds.getDelimited(line);
-    if (FAILED(result)) {
-        return result;
-    }
+    tds.getDelimited(line);
     
     if (line.length >= 5 && line[0..5] == "ERROR") {
         throw new Exception(line);        
     }
     long length = to!(long)(line);
-    object = new LimitedStream(tds, length, false);
-    return S_OK;
+    return new LimitedStream(tds, length, false);
 }
 
 int main(string[] args)
@@ -66,18 +59,9 @@ int main(string[] args)
         socket.connect(new InternetAddress(args[1], to!(int)(args[2])));
         Stream tds = bufferReadStream(new SocketStream(socket));
         Stream stdout = new StdoutStream;
-        Stream object;
         
-        result_t result = raw(tds, args[3], object);
-        if (FAILED(result)) {
-            Stderr.formatln("Failed to communicate with triton: {}", result);
-            return;
-        }
-        result = transferStream(object, stdout);
-        if (FAILED(result)) {
-            Stderr.formatln("Failed to read object from triton: {}", result);
-            return;
-        }
+        Stream object = raw(tds, args[3]);
+        transferStream(object, stdout);
         
         ret = 0;
     }));

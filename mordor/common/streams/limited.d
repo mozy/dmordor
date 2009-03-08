@@ -2,6 +2,7 @@ module mordor.common.streams.limited;
 
 import tango.math.Math;
 
+import mordor.common.exception;
 public import mordor.common.streams.filter;
 
 class LimitedStream : FilterStream
@@ -22,79 +23,61 @@ public:
     bool supportsSize() { return true; }
     bool supportsTruncate() { return false; }
     
-    result_t read(Buffer b, size_t len)
+    size_t read(Buffer b, size_t len)
     {
         if (_pos >= _size) {
             return 0;
         }
         len = min(len, _size - _pos);
-        result_t result = super.read(b, len);
-        if (SUCCEEDED(result)) {
-            _pos += result;
-        }
+        size_t result = super.read(b, len);
+        _pos += result;
         return result;
     }
     
-    result_t write(Buffer b, size_t len)
+    size_t write(Buffer b, size_t len)
     {
         if (_pos >= _size) {
-            return E_FAIL;
+            throw new BeyondEofException();
         }
         len = min(len, _size - _pos);
-        result_t result = super.write(b, len);
-        if (result > 0) {
-            _pos += result;
-        }
+        size_t result = super.write(b, len);
+        _pos += result;
         return result;
     }
     
-    result_t seek(long offset, Anchor anchor, out long pos)
+    long seek(long offset, Anchor anchor)
     {
         switch(anchor) {
             case Anchor.BEGIN:
                 if (offset < 0) {
-                    return E_INVALIDARG;
+                    throw new IllegalArgumentException("offset");
                 }
                 break;
             case Anchor.CURRENT:
                 if (offset + _pos < 0) {
-                    return E_INVALIDARG;
+                    throw new IllegalArgumentException("offset");
                 }
                 break;
             case Anchor.END:
-                long s;
-                result_t result = size(s);
-                if (result != 0)
-                    return result;
-                offset = s + offset;
+                offset += size();
                 anchor = Anchor.BEGIN;
                 if (offset < 0) {
-                    return E_INVALIDARG;
+                    throw new IllegalArgumentException("offset");
                 }
                 break;
-            default:
-                return -1;
         }
-        result_t result = super.seek(offset, anchor, pos);
-        if (result == 0)
-            _pos = pos;
-        return result;
+        return _pos = super.seek(offset, anchor);
     }
     
-    result_t size(out long size)
+    long size()
     {
         if (!super.supportsSize) {
-            size = _size;
-            return S_OK;
+            return _size;
         }
-        result_t result = super.size(size);
-        if (result == 0) {
-            size = min(size, _size);
-        }
-        return result;
+        return min(_size, super.size());
     }
     
-    result_t truncate(long size) { assert(false); return E_NOTIMPL; }
+    void truncate(long size) { assert(false); }
     
 private:
     long _pos, _size;

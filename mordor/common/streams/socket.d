@@ -3,6 +3,7 @@ module mordor.common.streams.socket;
 import tango.net.Socket;
 import tango.util.log.Log;
 
+import mordor.common.exception;
 public import mordor.common.streams.stream;
 
 private Logger _log;
@@ -24,7 +25,7 @@ public:
     bool supportsRead() { return true; }
     bool supportsWrite() { return true; }
 
-    result_t close(CloseType type = CloseType.BOTH)
+    void close(CloseType type = CloseType.BOTH)
     {        
         if (_s !is null && _own) {
             SocketShutdown socketShutdown;
@@ -47,23 +48,29 @@ public:
                 _s.shutdown(socketShutdown);
             }
         }
-        return S_OK;
     }
 
-    result_t read(Buffer b, size_t len)
+    size_t read(Buffer b, size_t len)
     {
         _log.trace("Receiving {} from socket {}", len, cast(void*)_s);
         int rc = _s.receive(b.writeBufs(len));
         _log.trace("Received {} from socket {}", rc, cast(void*)_s);
-        if (rc > 0) {
-            b.produce(rc);
+        if (rc < 0) {
+            throw exceptionFromLastError();
         }
-        return RESULT_FROM_LASTERROR(rc);
+        b.produce(rc);
+        return rc;
     }
 
-    result_t write(Buffer b, size_t len)
+    size_t write(Buffer b, size_t len)
     {
-        return RESULT_FROM_LASTERROR(_s.send(b.readBufs(len)));
+        int rc = _s.send(b.readBufs(len));
+        if (rc == 0) {
+            throw new ZeroLengthWriteException();
+        } else if (rc < 0) {
+            throw exceptionFromLastError();
+        }
+        return rc;
     }
 
 private:
