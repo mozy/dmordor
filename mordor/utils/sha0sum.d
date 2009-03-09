@@ -29,13 +29,23 @@ void main(string[] args)
             Stream inStream;
             if (arg == "-")
                 inStream = new StdinStream;
-            else
-                inStream = new FileStream(arg, FileStream.Flags.READ);
+            else {
+                try {
+                    inStream = new FileStream(arg, FileStream.Flags.READ);
+                } catch (Exception ex) {
+                    Stderr.formatln("{}  {}", arg, ex);
+                    continue;
+                }
+            }
 
             scope DigestStream digest = new DigestStream(inStream, new Sha0);
 
-            transferStream(digest, NilStream.get);
-            Stdout.formatln("{}  {}", digest.hexDigest(), arg);
+            try {
+                transferStream(digest, NilStream.get);
+                Stdout.formatln("{}  {}", digest.hexDigest(), arg);
+            } catch (Exception ex) {
+                Stderr.formatln("{}  {}", arg, ex);
+            }
         }
         pool.stop();
     }));
