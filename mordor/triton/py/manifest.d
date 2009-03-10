@@ -26,39 +26,44 @@ struct PatchInfo
     ubyte[] hash;
     int attribs;
     
+    
     static PatchInfo parse(string patchline)
     {
         PatchInfo pi;
+        string hashstring;
         string[] fields = split(patchline, ":");
         switch (fields.length) {
             case 5:
                 pi.btime = pi.mtime = to!(uint)(fields[0]);
                 pi.filesize = to!(long)(fields[1]);
-                pi.patchsize = to!(long)(fields[2]);
-                pi.flags = to!(int)(fields[3]);
-                pi.hash = cast(ubyte[])(fields[4]);
+                pi.flags = to!(int)(fields[2]);
+                hashstring = fields[3];
+                pi.patchsize = to!(long)(fields[4]);
                 break;
             case 6:
                 pi.btime = to!(uint)(fields[0]);
                 pi.mtime = to!(uint)(fields[1]);
                 pi.filesize = to!(long)(fields[2]);
-                pi.patchsize = to!(long)(fields[3]);
-                pi.flags = to!(int)(fields[4]);
-                pi.hash = cast(ubyte[])(fields[5]);
+                pi.flags = to!(int)(fields[3]);
+                hashstring = fields[4];
+                pi.patchsize = to!(long)(fields[5]);
                 break;
             case 8:
                 pi.btime = to!(uint)(fields[0]);
                 pi.mtime = to!(uint)(fields[1]);
                 pi.ctime = to!(uint)(fields[2]);
                 pi.filesize = to!(long)(fields[3]);
-                pi.patchsize = to!(long)(fields[4]);
-                pi.flags = to!(int)(fields[5]);
-                pi.hash = cast(ubyte[])(fields[6]);
-                pi.attribs = to!(int)(fields[7]);
+                pi.flags = to!(int)(fields[4]);
+                hashstring = fields[5];
+                pi.attribs = to!(int)(fields[6]);
+                pi.patchsize = to!(long)(fields[7]);
                 break;
             default:
-                throw new InvalidManifestException("Invalid patchline " ~ patchline);                
+                throw new ConversionException("Invalid patchline " ~ patchline);                
         }
+        if (hashstring.length != 40 || !isHexString(hashstring))
+            throw new ConversionException("Invalid hash " ~ hashstring);
+        pi.hash = hexstringToData(hashstring);
         return pi;
     }
 }
