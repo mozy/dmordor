@@ -229,6 +229,13 @@ parallel_do(void delegate()[] dgs ...) {
     size_t executed = 0;
     size_t completed = 0;
     Fiber current = Fiber.getThis;
+    
+    if (current is null) {
+        foreach(dg; dgs) {
+            dg();
+        }
+        return;
+    }
 
     foreach(dg; dgs) {
         Fiber f = new Fiber(delegate void() {
