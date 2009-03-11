@@ -37,6 +37,8 @@ public:
 	bool supportsWrite() { return false; }
 	
 	size_t write() { assert(false); }
+    
+    char[] toString() { return "stdin"; }
 }
 
 class StdoutStream : NativeStream
@@ -58,6 +60,8 @@ public:
 	bool supportsRead() { return false; }
 	
 	size_t read() { assert(false); }
+    
+    char[] toString() { return "stdout"; }
 }
 
 class StderrStream : NativeStream
@@ -79,4 +83,6 @@ public:
 	bool supportsRead() { return false; }
 	
 	size_t read() { assert(false); }
+    
+    char[] toString() { return "stderr"; }
 }

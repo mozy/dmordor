@@ -68,12 +68,11 @@ body
             throw new StreamTransferException(readException, writeException);
     }
     
-    _log.trace("Transferring from {} to {}, limit {}", cast(void*)src,
-        cast(void*)dst, toTransfer);        
+    _log.trace("Transferring from {} to {}, limit {}", src, dst, toTransfer);        
     readBuffer = &buf1;
     read();
     throwException();
-    _log.trace("Read {} from {}", readResult, cast(void*)src);
+    _log.trace("Read {} from {}", readResult, src);
     if (readResult == 0 && toTransfer != -1L)
         throw new UnexpectedEofException();
     if (readResult == 0)
@@ -88,7 +87,7 @@ body
         parallel_do(&read, &write);
         throwException();
         _log.trace("Read {} from {}; wrote {} to {}; {}/{} total read/written",
-            readResult, cast(void*)src, writeResult, cast(void*)dst, totalRead, totalWritten);
+            readResult, src, writeResult, dst, totalRead, totalWritten);
         if (readResult == 0 && toTransfer != -1L)
             throw new UnexpectedEofException();
         if (readResult == 0)
@@ -98,7 +97,7 @@ body
     write();
     throwException();
     _log.trace("Wrote {} to {}; {}/{} total read/written", writeResult,
-        cast(void*)dst, totalRead, totalWritten);
+        dst, totalRead, totalWritten);
 }
 
 void transferStream(Stream src, Stream dst)

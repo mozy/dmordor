@@ -49,6 +49,7 @@ public:
     
     this(string filename, Flags flags = Flags.READWRITE, CreateFlags createFlags = CreateFlags.OPEN_EXISTING)
     {
+        _file = filename;
         NativeHandle handle;
         version (Windows) {
             DWORD access;
@@ -87,5 +88,18 @@ public:
             throw exceptionFromLastError();
         }
         super(handle);
+        _supportsRead = flags == Flags.READ || flags == Flags.READWRITE;
+        _supportsWrite = flags == Flags.WRITE || flags == Flags.READWRITE;
     }
+    
+    bool supportsRead() { return _supportsRead && super.supportsRead; }
+    bool supportsWrite() { return _supportsWrite && super.supportsWrite; }
+    
+    char[] toString() { return _file; }
+    
+private:
+    bool _supportsRead;
+    bool _supportsWrite;
+    
+    char[] _file;
 }
