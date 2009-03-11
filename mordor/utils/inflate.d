@@ -1,4 +1,4 @@
-module mordor.utils.zlibcat;
+module mordor.utils.inflate;
 
 import tango.io.Stdout;
 import tango.util.log.AppendConsole;
