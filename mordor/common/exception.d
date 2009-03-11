@@ -24,6 +24,9 @@ class BeyondEofException : StreamException
 class ZeroLengthWriteException : StreamException
 {}
 
+class StreamClosedException : StreamException
+{}
+
 class StreamTransferException : StreamException
 {
     Exception readException;
