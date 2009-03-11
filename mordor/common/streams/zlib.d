@@ -9,8 +9,8 @@ import mordor.common.exception;
 import mordor.common.streams.buffered;
 public import mordor.common.streams.filter;
 
-pragma (lib, "zlib");
-version (build) pragma (link, "z");
+version (Windows) pragma (lib, "zlib");
+version (Posix) version (build) pragma (link, "z");
 
 private Logger _log;
 
