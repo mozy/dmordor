@@ -265,7 +265,7 @@ public:
         return newBuf.readBuf[0..len];
     }
 
-    void[][] writeBufs(size_t len)
+    void[][] writeBufs(size_t len = ~0)
     out (result)
     {
         assert(writeAvailable >= len);
@@ -277,6 +277,8 @@ public:
     }
     body
     {
+        if (len == ~0)
+            len = writeAvailable;
         reserve(len);
         void[][] result;
         result.length = _bufs.size;
