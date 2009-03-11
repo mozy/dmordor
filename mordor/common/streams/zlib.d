@@ -10,6 +10,7 @@ import mordor.common.streams.buffered;
 public import mordor.common.streams.filter;
 
 pragma (lib, "zlib");
+version (build) pragma (link, "z");
 
 private Logger _log;
 
