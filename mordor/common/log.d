@@ -1,7 +1,7 @@
 module mordor.common.log;
 
 public import tango.util.log.Log;
-import tango.text.regex;
+import tango.text.Regex;
 import tango.io.Stdout;
 
 import mordor.common.config;
