@@ -1,5 +1,6 @@
 module mordor.kalypso.examples.scan;
 
+import tango.core.Variant;
 import tango.util.log.AppendConsole;
 import tango.io.Stdout;
 
@@ -19,6 +20,22 @@ void main()
         for(int i = 0; i < level * 4; ++i)
             Stdout.format(" ");
         Stdout.formatln("{}", object["name"].get!(tstring));
+        foreach(p; &object.properties) {
+            if (p == "name")
+                continue;
+            for(int i = 0; i < (level + 1) * 4; ++i)
+                Stdout.format(" ");
+            Variant v = object[p];
+            if (v.isA!(tstring))
+                Stdout.formatln("@{} = {}", p, v.get!(tstring));
+            else if (v.isA!(bool))
+                Stdout.formatln("@{} = {}", p, v.get!(bool));                
+        }
+        foreach(r; &object.references) {
+            for(int i = 0; i < (level + 1) * 4; ++i)
+                Stdout.format(" ");
+            Stdout.formatln("#{}", r["name"].get!(tstring));
+        }
         if (level >= 2)
             return;
         try {

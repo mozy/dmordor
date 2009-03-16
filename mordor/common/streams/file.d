@@ -47,6 +47,32 @@ public:
         TRUNCATE_EXISTING        
     }
     
+    version (Windows) {
+        this(wstring filename, Flags flags = Flags.READWRITE, CreateFlags createFlags = CreateFlags.OPEN_EXISTING)
+        {
+            _fileW = filename;
+            NativeHandle handle;
+            DWORD access;
+            if (flags & flags.READ)
+                access |= GENERIC_READ;
+            if (flags & flags.WRITE)
+                access |= GENERIC_WRITE;
+            handle = CreateFileW(toString16z(filename),
+                access,
+                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                NULL,
+                cast(DWORD)createFlags,
+                0,
+                NULL);
+            if (handle == cast(NativeHandle)-1) {
+                throw exceptionFromLastError();
+            }
+            super(handle);
+            _supportsRead = flags == Flags.READ || flags == Flags.READWRITE;
+            _supportsWrite = flags == Flags.WRITE || flags == Flags.READWRITE;
+        }
+    }
+    
     this(string filename, Flags flags = Flags.READWRITE, CreateFlags createFlags = CreateFlags.OPEN_EXISTING)
     {
         _file = filename;
@@ -57,7 +83,7 @@ public:
                 access |= GENERIC_READ;
             if (flags & flags.WRITE)
                 access |= GENERIC_WRITE;
-            handle = CreateFile(toStringz(filename),
+            handle = CreateFileA(toStringz(filename),
                 access,
                 FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                 NULL,
@@ -95,11 +121,12 @@ public:
     bool supportsRead() { return _supportsRead && super.supportsRead; }
     bool supportsWrite() { return _supportsWrite && super.supportsWrite; }
     
-    char[] toString() { return _file; }
+    string toString() { return _file; }
     
 private:
     bool _supportsRead;
     bool _supportsWrite;
     
-    char[] _file;
+    string _file;
+    version (Windows) wstring _fileW;
 }

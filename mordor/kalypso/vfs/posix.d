@@ -7,6 +7,7 @@ import tango.stdc.posix.unistd;
 import tango.stdc.stringz;
 
 import mordor.common.exception;
+import mordor.common.streams.file;
 import mordor.common.streams.stream;
 import mordor.common.stringutils;
 import mordor.kalypso.vfs.model;
@@ -87,18 +88,29 @@ class PosixDirectory : IObject
     }
     int references(int delegate(ref IObject) dg) { return 0; }
     int properties(int delegate(ref string) dg) {
+        static string directory = "directory";
         static string name = "name";
-        return dg(name);
+        static string hidden = "hidden";
+        int ret;
+        if ( (ret = dg(directory)) != 0) return ret;
+        if ( (ret = dg(name)) != 0) return ret;
+        if (_name.length > 0 && _name[0] == '.')
+            if ( (ret = dg(hidden)) != 0) return ret;
+        return 0;
     }
     
     Variant opIndex(string property)
-    in
     {
-        assert(property == "name");
-    }
-    body
-    {
-        return Variant(_name);
+        switch (property) {
+            case "name":
+                return Variant(_name);
+            case "directory":
+                return Variant(true);
+            case "hidden":
+                return Variant(_name.length > 0 && _name[0] == '.');
+            default:
+                return Variant.init;
+        }
     }
     
     void opIndexAssign(Variant value, string property)
@@ -113,6 +125,58 @@ class PosixDirectory : IObject
     
     Stream open()
     { return null; }
+
+private:
+    string _abspath;
+    string _name;
+    dirent _dirent;
+}
+
+class PosixFile : IObject
+{    
+    this(string parent, dirent* ent)
+    {
+        _dirent = *ent;
+        _name = nameFromDirent(&_dirent);
+        _abspath = parent ~ _name;        
+    }
+
+    int children(int delegate(ref IObject) dg) { return 0; }
+    int references(int delegate(ref IObject) dg) { return 0; }
+    int properties(int delegate(ref string) dg) {
+        static string name = "name";
+        static string hidden = "hidden";
+        int ret;
+        if ( (ret = dg(name)) != 0) return ret;
+        if (_name.length > 0 && _name[0] == '.')
+            if ( (ret = dg(hidden)) != 0) return ret;
+        return 0;            
+    }
+    
+    Variant opIndex(string property)
+    {
+        switch (property) {
+            case "name":
+                return Variant(_name);
+            case "hidden":
+                return Variant(_name.length > 0 && _name[0] == '.');
+            default:
+                return Variant.init;
+        }
+    }
+    
+    void opIndexAssign(Variant value, string property)
+    { assert(false); }
+    
+    void _delete()
+    {
+        if (unlink(toStringz(_abspath)) != 0) {
+            throw exceptionFromLastError();
+        }
+    }
+    
+    Stream open()
+    { return new FileStream(_abspath); }
 
 private:
     string _abspath;

@@ -7,6 +7,7 @@ import win32.winbase;
 import win32.windef;
 
 import mordor.common.exception;
+import mordor.common.streams.file;
 import mordor.common.streams.stream;
 import mordor.common.stringutils;
 import mordor.kalypso.vfs.model;
@@ -106,8 +107,7 @@ class Win32Volume : IObject
             if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
                 object = new Win32Directory(_volume, &findData);
             } else {
-                // TODO: files
-                continue;                
+                object = new Win32File(_volume, &findData);             
             }
             if ( (ret = dg(object)) != 0) return ret;
         } while (FindNextFileW(hFind, &findData))
@@ -182,17 +182,17 @@ class Win32MountPoint : IObject
     }
     
     Variant opIndex(wstring property)
-    in
-    {
-        assert(property == "name");
-    }
     body
     {
-        return Variant(_root[0..$ - 1]);
+        if (property == "name")
+            return Variant(_root[0..$ - 1]);
+        return Variant.init;
     }
     
     void opIndexAssign(Variant value, wstring property)
-    { assert(false); }
+    {
+        assert(false);
+    }
     
     void _delete()
     { assert(false); }
@@ -205,16 +205,82 @@ private:
     wstring _volume;
 }
 
-class Win32Directory : IObject
+class Win32Object : IObject
 {
-    this(wstring parent, WIN32_FIND_DATAW* findData)
+    this(WIN32_FIND_DATAW* findData)
     {
         _findData = *findData;
         _name = fromString16z(_findData.cFileName.ptr);
-        _log.trace("Creating directory {}", _name);
-        _abspath = parent ~ _name ~ r"\*";
     }
 
+    abstract int children(int delegate(ref IObject) dg);
+    abstract int references(int delegate(ref IObject) dg);
+
+    int properties(int delegate(ref wstring) dg) {
+        int ret;
+        foreach(p; _properties) {
+            if ( (ret = dg(p)) != 0) return ret;
+        }
+        return 0;
+    }
+    
+    Variant opIndex(wstring property)
+    {
+        switch (property) {
+            case "name":
+                return Variant(_name);
+            case "archive":
+                return Variant(!!(_findData.dwFileAttributes & FILE_ATTRIBUTE_ARCHIVE));
+            case "compressed":
+                return Variant(!!(_findData.dwFileAttributes & FILE_ATTRIBUTE_COMPRESSED));
+            case "encrypted":
+                return Variant(!!(_findData.dwFileAttributes & FILE_ATTRIBUTE_ENCRYPTED));
+            case "hidden":
+                return Variant(!!(_findData.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN));
+            case "not_content_indexed":
+                return Variant(!!(_findData.dwFileAttributes & FILE_ATTRIBUTE_NOT_CONTENT_INDEXED));
+            case "read_only":
+                return Variant(!!(_findData.dwFileAttributes & FILE_ATTRIBUTE_READONLY));
+            case "system":
+                return Variant(!!(_findData.dwFileAttributes & FILE_ATTRIBUTE_SYSTEM));
+            case "temporary":
+                return Variant(!!(_findData.dwFileAttributes & FILE_ATTRIBUTE_TEMPORARY));
+            default:
+                return Variant.init;
+        }
+    }
+    
+    void opIndexAssign(Variant value, wstring property)
+    { assert(false); }
+    
+    abstract void _delete();
+    abstract Stream open();
+
+private:
+    static wstring[] _properties = ["name",
+                                    "archive",
+                                    "compressed",
+                                    "encrypted",
+                                    "hidden",
+                                    "not_content_indexed",
+                                    "read_only",
+                                    "system",
+                                    "temporary"];
+    wstring _name;
+    WIN32_FIND_DATAW _findData;
+    
+protected:
+    wstring _abspath;
+}
+
+class Win32Directory : Win32Object
+{
+    this(wstring parent, WIN32_FIND_DATAW* findData)
+    {
+        super(findData);
+        _abspath = parent ~ _name ~ r"\*";
+    }
+    
     int children(int delegate(ref IObject) dg) {
         WIN32_FIND_DATAW findData;
         int ret;
@@ -230,8 +296,7 @@ class Win32Directory : IObject
                     continue;
                 object = new Win32Directory(_abspath[0..$-1], &findData);
             } else {
-                // TODO: files
-                continue;                
+                object = new Win32File(_abspath[0..$-1], &findData);
             }
             if ( (ret = dg(object)) != 0) return ret;
         } while (FindNextFileW(hFind, &findData))
@@ -241,22 +306,18 @@ class Win32Directory : IObject
     }
     int references(int delegate(ref IObject) dg) { return 0; }
     int properties(int delegate(ref wstring) dg) {
-        static wstring name = "name";
-        return dg(name);
+        int ret;
+        static wstring directory = "directory";
+        if ( (ret = dg(directory)) != 0) return ret;
+        return super.properties(dg);
     }
     
     Variant opIndex(wstring property)
-    in
     {
-        assert(property == "name");
+        if (property == "directory")
+            return Variant(true);
+        return super[property];
     }
-    body
-    {
-        return Variant(_name);
-    }
-    
-    void opIndexAssign(Variant value, wstring property)
-    { assert(false); }
     
     void _delete()
     {
@@ -268,8 +329,33 @@ class Win32Directory : IObject
     Stream open()
     { return null; }
 
-private:
-    wstring _abspath;
-    wstring _name;
-    WIN32_FIND_DATAW _findData;
+}
+
+class Win32File : Win32Object
+{
+    this(wstring parent, WIN32_FIND_DATAW* findData)
+    {
+        super(findData);
+        _abspath = parent ~ _name;
+    }
+    
+    int children(int delegate(ref IObject) dg) {
+        // TODO: enum ADS
+        return 0;
+    }
+    int references(int delegate(ref IObject) dg) {
+        return children(dg);
+    }
+    
+    void _delete()
+    {
+        if (!DeleteFileW(toString16z(_abspath))) {
+            throw exceptionFromLastError();
+        }
+    }
+
+    Stream open()
+    {
+        return new FileStream(_abspath);
+    }
 }
