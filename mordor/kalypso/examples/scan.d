@@ -6,6 +6,7 @@ import tango.io.Stdout;
 import mordor.common.config;
 import mordor.common.exception;
 import mordor.common.log;
+import mordor.common.stringutils;
 import mordor.kalypso.vfs.manager;
 
 void main()
@@ -17,7 +18,7 @@ void main()
     void recurse(IObject object, int level) {
         for(int i = 0; i < level * 4; ++i)
             Stdout.format(" ");
-        Stdout.formatln("{}", object["name"]);
+        Stdout.formatln("{}", object["name"].get!(tstring));
         if (level >= 2)
             return;
         try {

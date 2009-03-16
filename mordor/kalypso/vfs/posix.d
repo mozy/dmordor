@@ -1,5 +1,6 @@
 module mordor.kalypso.vfs.posix;
 
+import tango.core.Variant;
 import tango.stdc.errno;
 import tango.stdc.posix.dirent;
 import tango.stdc.posix.unistd;
@@ -27,13 +28,13 @@ class PosixVFS : PosixDirectory, IVFS
         super("/");
     }
     
-    string opIndex(string property)
+    Variant opIndex(string property)
     {
         if (property == "name")
-            return "posix";
+            return Variant("posix");
         return super[property];
     }
-    void opIndexAssign(string value, string property)
+    void opIndexAssign(Variant value, string property)
     {
         if (property == "name")
             assert(false);
@@ -90,17 +91,17 @@ class PosixDirectory : IObject
         return dg(name);
     }
     
-    string opIndex(string property)
+    Variant opIndex(string property)
     in
     {
         assert(property == "name");
     }
     body
     {
-        return _name;
+        return Variant(_name);
     }
     
-    void opIndexAssign(string value, string property)
+    void opIndexAssign(Variant value, string property)
     { assert(false); }
     
     void _delete()

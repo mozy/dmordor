@@ -1,5 +1,6 @@
 module mordor.kalypso.vfs.win32;
 
+import tango.core.Variant;
 import tango.stdc.stringz;
 import tango.util.log.Log;
 import win32.winbase;
@@ -57,17 +58,17 @@ class Win32VFS : IVFS
         return dg(name);
     }
 
-    wstring opIndex(wstring property)
+    Variant opIndex(wstring property)
     in
     {
         assert(property == "name");
     }
     body
     {
-        return "win32";
+        return Variant("win32"w);
     }
     
-    void opIndexAssign(wstring value, wstring property)
+    void opIndexAssign(Variant value, wstring property)
     { assert(false); }
     
     void _delete()
@@ -120,17 +121,17 @@ class Win32Volume : IObject
         return dg(name);
     }
     
-    wstring opIndex(wstring property)
+    Variant opIndex(wstring property)
     in
     {
         assert(property == "name");
     }
     body
     {
-        return _volume[4..48];
+        return Variant(_volume[4..48]);
     }
     
-    void opIndexAssign(wstring value, wstring property)
+    void opIndexAssign(Variant value, wstring property)
     { assert(false); }
     
     void _delete()
@@ -180,17 +181,17 @@ class Win32MountPoint : IObject
         return dg(name);
     }
     
-    wstring opIndex(wstring property)
+    Variant opIndex(wstring property)
     in
     {
         assert(property == "name");
     }
     body
     {
-        return _root[0..$ - 1];
+        return Variant(_root[0..$ - 1]);
     }
     
-    void opIndexAssign(wstring value, wstring property)
+    void opIndexAssign(Variant value, wstring property)
     { assert(false); }
     
     void _delete()
@@ -244,17 +245,17 @@ class Win32Directory : IObject
         return dg(name);
     }
     
-    wstring opIndex(wstring property)
+    Variant opIndex(wstring property)
     in
     {
         assert(property == "name");
     }
     body
     {
-        return _name;
+        return Variant(_name);
     }
     
-    void opIndexAssign(wstring value, wstring property)
+    void opIndexAssign(Variant value, wstring property)
     { assert(false); }
     
     void _delete()
