@@ -1,6 +1,15 @@
 module mordor.common.stringutils;
 
 alias char[] string;
+alias wchar[] wstring;
+
+version (Windows) {
+    alias wchar tchar;
+} else {
+    alias char tchar;
+}
+
+alias tchar[] tstring;
 
 ubyte[] hexstringToData(string str)
 in
