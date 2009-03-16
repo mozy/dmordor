@@ -53,8 +53,10 @@ public:
         remaining -= buffered;
         
         if (remaining == 0) {
+            _log.trace("Read {} from buffer", len);
             return len;
         }
+        _log.trace("Read {}/{} from buffer", len - remaining, len);
 
         if (buffered == 0 || !_allowPartialReads) {
             do {
@@ -63,6 +65,7 @@ public:
                 size_t result;
                 try {
                     result = super.read(_readBuffer, todo);
+                    _log.trace("Read {}/{} from parent", result, todo);
                 } catch(PlatformException ex){
                     if (remaining == len) {
                         throw ex;
