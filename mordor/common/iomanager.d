@@ -2,6 +2,7 @@ module mordor.common.iomanager;
 
 import tango.io.Stdout;
 
+import mordor.common.exception;
 public import mordor.common.scheduler;
 
 version(linux) {
@@ -29,7 +30,7 @@ version(Windows)
         {
             HANDLE hRet = CreateIoCompletionPort(handle, m_hCompletionPort, 0, 0);
             if (hRet != m_hCompletionPort) {
-                throw new Exception("Couldn't associate handle with completion port.");
+                throw exceptionFromLastError();
             }
         }
 
