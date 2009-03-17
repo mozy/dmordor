@@ -2,32 +2,63 @@ module mordor.kalypso.examples.watcher;
 
 import tango.io.Stdout;
 import tango.stdc.posix.sys.types;
-import tango.sys.linux.inotify;
 import tango.util.log.AppendConsole;
 
 import mordor.common.config;
+import mordor.common.exception;
+import mordor.common.iomanager;
 import mordor.common.log;
 import mordor.common.stringutils;
-import mordor.kalypso.vfs.inotify;
+version (linux) import mordor.kalypso.vfs.inotify;
+import mordor.kalypso.vfs.model;
+version (Windows) import mordor.kalypso.vfs.readdirectorychangesw;
 
-void main(string[] args)
+version (Windows) {
+    import tango.stdc.stringz;
+    import win32.shellapi;
+    import win32.winbase;
+
+    void main() {
+        int argc;
+        wchar** argsPtr = CommandLineToArgvW(GetCommandLineW(), &argc);
+        if (argsPtr is null)
+            throw exceptionFromLastError();
+        wstring[] args;
+        args.length = argc;
+        foreach(i, arg; argsPtr[0..argc]) {
+            args[i] = fromString16z(arg);            
+        }
+        tmain(args);
+    }
+} else {
+    void main(string[] args) {
+        tmain(args);
+    }
+}
+
+void tmain(tstring[] args)
 {
     Config.loadFromEnvironment();
     Log.root.add(new AppendConsole());
     enableLoggers();
+    
+    IOManager ioManager = new IOManager(1);
+    IWatcher watcher;
 
-    scope inotify = new InotifyWatcher(delegate void(tstring filename, uint events) {
-        Stdout.formatln("File: {} Events: 0x{:x}", filename, events);
-    });
+    version (linux) watcher = new InotifyWatcher(ioManager,
+        delegate void(tstring filename, IWatcher.Events events) {
+            Stdout.formatln("File: {} Events: 0x{:x}", filename, events);
+        });
+    version (Windows) watcher = new ReadDirectoryChangesWWatcher(ioManager,
+        delegate void(tstring filename, IWatcher.Events events) {
+            Stdout.formatln("File: {} Events: 0x{:x}", filename, events);
+        });
 
-    args = args[0..$];
+    args = args[1..$];
     foreach(arg; args) {
-        string path = arg;
-        uint events = IN_ALL_EVENTS;
-        if (path.length > 0 && path[$ - 1] == '/') {
-            path.length = path.length - 1;
-        }
-        inotify.watch(path, events);
+        tstring path = arg;
+        watcher.watch(path, IWatcher.Events.All);
     }
-    inotify.run();
+    
+    ioManager.start(true);
 }
