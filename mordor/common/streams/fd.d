@@ -1,19 +1,57 @@
 module mordor.common.streams.fd;
 
+import tango.stdc.errno;
+import tango.stdc.posix.fcntl;
 import tango.stdc.posix.unistd;
 import tango.stdc.posix.sys.stat;
 import tango.stdc.posix.sys.uio;
+version(linux) import tango.sys.linux.epoll;
 
 import mordor.common.exception;
+import mordor.common.iomanager;
 public import mordor.common.streams.stream;
 
 class FDStream : Stream
 {
 public:
     this(int fd, bool ownFd = true)
+    in
+    {
+        assert(fd >= 0);
+    }
+    body
     {
         _fd = fd;
         _own = ownFd;
+    }
+
+    this(IOManager ioManager, int fd, bool ownFd = true)
+    in
+    {
+        assert(fd >= 0);
+        assert(ioManager !is null);
+    }
+    body
+    {
+        _ioManager = ioManager;
+        _fd = fd;
+        _own = ownFd;
+        if (fcntl(_fd, F_SETFL, O_NONBLOCK) < 0)
+            throw exceptionFromLastError();
+        version (linux) {
+            _readEvent.event.events = EPOLLIN;
+            _writeEvent.event.events = EPOLLOUT;
+        } else version (darwin) {
+            _readEvent.event.filter = EVFILT_READ;
+            _writeEvent.event.filter = EVFILT_WRITE;
+        }
+        version (linux) {
+            _readEvent.event.data.fd = _fd;
+            _writeEvent.event.data.fd = _fd;
+        } else version (darwin) {
+            _readEvent.event.ident = _fd;
+            _writeEvent.event.ident = _fd;
+        }
     }
     ~this() { close(); } 
     
@@ -42,6 +80,11 @@ public:
     {
         iovec[] iov = makeIovec(b.writeBufs(len));
         int rc = readv(_fd, iov.ptr, iov.length);
+        while (rc < 0 && errno == EAGAIN && _ioManager !is null) {
+            _ioManager.registerEvent(&_readEvent);
+            Fiber.yield();
+            rc = readv(_fd, iov.ptr, iov.length);
+        }
         if (rc < 0) {
             throw exceptionFromLastError();
         }
@@ -53,6 +96,11 @@ public:
     {
         iovec[] iov = makeIovec(b.readBufs(len));
         int rc = writev(_fd, iov.ptr, iov.length);
+        while (rc < 0 && errno == EAGAIN && _ioManager !is null) {
+            _ioManager.registerEvent(&_writeEvent);
+            Fiber.yield();
+            rc = writev(_fd, iov.ptr, iov.length);
+        }
         if (rc == 0) {
             throw new ZeroLengthWriteException();
         }
@@ -90,6 +138,9 @@ public:
     }
     
 private:
+    IOManager _ioManager;
+    AsyncEvent _readEvent;
+    AsyncEvent _writeEvent;
     int _fd;
     bool _own;
 }

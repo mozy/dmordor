@@ -42,6 +42,7 @@ public:
 		_ioManager = ioManager;
 		_hFile = hFile;
 		_own = ownHandle;
+        _ioManager.registerFile(hFile);
 	}
     ~this() { close(); }
 	
