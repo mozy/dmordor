@@ -4,42 +4,76 @@ import tango.core.Thread;
 import tango.stdc.posix.unistd;
 import tango.stdc.stringz;
 import tango.sys.linux.inotify;
+import tango.util.log.Log;
 
 import mordor.common.exception;
+import mordor.common.iomanager;
 import mordor.common.streams.buffered;
 import mordor.common.streams.fd;
 import mordor.common.stringutils;
+import mordor.kalypso.vfs.model;
 
-class InotifyWatcher
+private Logger _log;
+
+static this()
+{
+    _log = Log.lookup("mordor.kalypso.vfs.inotify");
+}
+
+class InotifyWatcher : IWatcher
 {
 private:
-    this()
+    this(IOManager ioManager)
     {
         _fd = inotify_init();
         if (_fd < 0)
             throw exceptionFromLastError();
-        _inotifyStream = new BufferedStream(new FDStream(_fd));
+        _inotifyStream = new BufferedStream(new FDStream(ioManager, _fd));
+        ioManager.schedule(new Fiber(&this.run));
     }
 public:
-    this(void delegate(string, uint) dg)
+    this(IOManager ioManager, void delegate(string, Events) dg)
     {
-        this();
+        this(ioManager);
         _dg = dg;
     }
     
-    this(void function(string, uint) fn)
+    this(IOManager ioManager, void function(string, Events) fn)
     {
-        this();
+        this(ioManager);
         _fn = fn;
     }
     // no ~this; FDStream owns the fd
     
-    void watch(string path, uint events)
+    Events supportedEvents()
     {
-        int wd = inotify_add_watch(_fd, toStringz(path), events);
+        return Events.AccessTime | Events.ModificationTime |
+            Events.Metadata | Events.CloseWrite | Events.CloseNoWrite |
+            Events.Close | Events.Open | Events.MovedFrom | Events.MovedTo |
+            Events.Move | Events.Create | Events.Delete |
+            Events.EventsDropped | Events.FileDirect | Events.IncludeSelf |
+            Events.Files | Events.Directories | Events.OneShot;
+    }
+
+    void watch(string path, Events events)
+    in
+    {
+        assert(path.length > 0);
+    }
+    body
+    {
+        if (path[$-1] == '/')
+            path = path[0..$-1];
+        Events requested = events;
+        uint inotifyEvents;
+        mapEvents(inotifyEvents, events);
+        mapFlags(inotifyEvents, events);
+        _log.trace("Watching {} with events 0x{:x} (requested 0x{:x}, really 0x{:x})",
+            path, inotifyEvents, requested, events);
+        int wd = inotify_add_watch(_fd, toStringz(path), inotifyEvents);
         if (wd < 0)
             throw exceptionFromLastError();
-        _wdToPath[wd] = path;
+        _wdToDetails[wd] = WatchDetails(path, events);
         _pathToWd[path] = wd;
     }
     
@@ -54,7 +88,8 @@ public:
         if (rc != 0)
             throw exceptionFromLastError();
     }
-    
+ 
+private:
     void run()
     {
         inotify_event event;
@@ -69,16 +104,16 @@ public:
             if (event.wd == -1) {
                 assert(event.mask == IN_Q_OVERFLOW);
                 if (_dg !is null)
-                    _dg("", event.mask);
+                    _dg("", Events.EventsDropped);
                 if (_fn !is null)
-                    _fn("", event.mask);
+                    _fn("", Events.EventsDropped);
                 continue;
             }
             
-            string absPath = _wdToPath[event.wd];
+            auto details = _wdToDetails[event.wd];
             if (event.mask & IN_IGNORED) {
-                _wdToPath.remove(event.wd);
-                _pathToWd.remove(absPath);
+                _wdToDetails.remove(event.wd);
+                _pathToWd.remove(details.path);
             }
             
             filename.length = 0;
@@ -92,21 +127,76 @@ public:
                 while (filename.length > 0 && filename[$ - 1] == '\0') filename.length = filename.length - 1;
             }
 
+            if (!(details.events & Events.Files) &&
+                !(event.mask & IN_ISDIR)) {
+                continue;
+            }
+            if (!(details.events & Events.Directories) &&
+                 (event.mask & IN_ISDIR)) {
+                continue;
+            }
+
+            Events events = mapInotifyEvents(event.mask);
+
+            string absPath = details.path;
             if (filename.length > 0)
                 absPath ~= '/' ~ filename;
             if (_dg !is null)
-                _dg(absPath, event.mask);
+                _dg(absPath, events);
             if (_fn !is null)
-                _fn(absPath, event.mask);
+                _fn(absPath, events);
         }
     }
-    
-    
-private:
+
+    void mapEvents(out uint inotifyEvents, ref Events events)
+    {
+        inotifyEvents = cast(uint)events & 0x03ff;
+        events = cast(Events)((cast(uint)events & 0xffff0000) | inotifyEvents);
+        if (events & Events.Close)
+            inotifyEvents |= IN_CLOSE_WRITE | IN_CLOSE_NOWRITE;
+        if (events & Events.Move)
+            inotifyEvents |= IN_MOVED_FROM | IN_MOVED_TO;      
+    }
+    void mapFlags(ref uint inotifyEvents, ref Events events)
+    {
+        if ((events & (events.Files | events.Directories)) == 0)
+            events |= Events.Files | Events.Directories;
+        if (events & Events.FileDirect) {
+            events |= Events.IncludeSelf;
+            events &= ~(Events.Files | Events.Directories);
+            events |= Events.Files;
+        } else
+            inotifyEvents |= IN_ONLYDIR;
+        if ((events & Events.IncludeSelf) && (events & (Events.MovedFrom | Events.Move)))
+            inotifyEvents |= IN_MOVE_SELF;
+        if ((events & Events.IncludeSelf) && (events & Events.Delete))
+            inotifyEvents |= IN_DELETE_SELF;  
+    }
+    Events mapInotifyEvents(uint inotifyEvents) {
+        Events events = cast(Events)(inotifyEvents & 0x3ff);
+        if (inotifyEvents & IN_DELETE_SELF)
+            events |= Events.Delete;
+        if (inotifyEvents & (IN_MOVE_SELF | IN_MOVED_FROM | IN_MOVED_TO))
+            events |= Events.Move;
+        if (inotifyEvents & (IN_CLOSE_NOWRITE | IN_CLOSE_WRITE))
+            events |= Events.Close;
+        if (inotifyEvents & IN_ISDIR)
+            events |= Events.Directories;
+        else
+            events |= Events.Files;
+        return events;
+    }
+
+    struct WatchDetails
+    {
+        string path;
+        Events events;
+    }
+
     int _fd = -1;
-    string[int] _wdToPath;
+    WatchDetails[int] _wdToDetails;
     int[string] _pathToWd;
     Stream _inotifyStream;
-    void delegate(string, uint) _dg;
-    void function(string, uint) _fn;
+    void delegate(string, Events) _dg;
+    void function(string, Events) _fn;
 }
