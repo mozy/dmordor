@@ -77,8 +77,7 @@ class PosixDirectory : IObject
                     continue;
                 object = new PosixDirectory(_abspath, ent);
             } else {
-                // TODO: files, symlinks
-                continue;
+                object = new PosixFile(_abspath, ent);
             }
             if ( (ret = dg(object)) != 0) return ret;
         }
