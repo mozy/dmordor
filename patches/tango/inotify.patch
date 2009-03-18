@@ -54,7 +54,7 @@ index 0000000..83f086d
 +        }
 +        
 +        /* Create and initialize inotify instance.  */
-+        int inotify_init (void);
++        int inotify_init ();
 +
 +        /* Add watch of object NAME to inotify instance FD.  Notify about events specified by MASK.  */
 +        int inotify_add_watch (int fd, char* name, uint mask);
