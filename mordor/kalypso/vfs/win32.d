@@ -60,13 +60,10 @@ class Win32VFS : IVFS
     }
 
     Variant opIndex(wstring property)
-    in
     {
-        assert(property == "name");
-    }
-    body
-    {
-        return Variant("win32"w);
+        if (property == "name")
+            return Variant("win32"w);
+        return Variant.init;
     }
     
     void opIndexAssign(Variant value, wstring property)
@@ -122,13 +119,10 @@ class Win32Volume : IObject
     }
     
     Variant opIndex(wstring property)
-    in
     {
-        assert(property == "name");
-    }
-    body
-    {
-        return Variant(_volume[4..48]);
+        if (property == "name")
+            return Variant(_volume[4..48]);
+        return Variant.init;
     }
     
     void opIndexAssign(Variant value, wstring property)
