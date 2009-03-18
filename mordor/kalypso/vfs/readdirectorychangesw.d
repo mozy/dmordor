@@ -144,8 +144,8 @@ class ReadDirectoryChangesWWatcher : IWatcher
     }
     body
     {
-        if (path[$-1] == '\\')
-            path = path[0..$-1];
+        if (path[$-1] != '\\')
+            path ~= r"\";
         
         HANDLE hDir = CreateFileW(toString16z(path),
                                   FILE_LIST_DIRECTORY,
@@ -159,7 +159,7 @@ class ReadDirectoryChangesWWatcher : IWatcher
         _ioManager.registerFile(hDir);
         auto worker = new Worker();
         worker.hDir = hDir;
-        worker.path = path ~ r"\";
+        worker.path = path;
         worker.events = events;
         _ioManager.schedule(new Fiber(&worker.run));
     }
