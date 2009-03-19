@@ -18,7 +18,7 @@ void main()
     long files, dirs;
     
     void recurse(IObject object, int level) {
-        /*for(int i = 0; i < level * 4; ++i)
+        for(int i = 0; i < level * 4; ++i)
             Stdout.format(" ");
         Stdout.formatln("{}", object["name"].get!(tstring));
         foreach(p; &object.properties) {
@@ -30,25 +30,29 @@ void main()
             if (v.isA!(tstring))
                 Stdout.formatln("@{} = {}", p, v.get!(tstring));
             else if (v.isA!(bool))
-                Stdout.formatln("@{} = {}", p, v.get!(bool));                
+                Stdout.formatln("@{} = {}", p, v.get!(bool));
+            else if (v.isA!(long))
+                Stdout.formatln("@{} = {}", p, v.get!(long));
+            else
+                Stdout.formatln("@{} ({})", p, v);
         }
         foreach(r; &object.references) {
             for(int i = 0; i < (level + 1) * 4; ++i)
                 Stdout.format(" ");
-            Stdout.formatln("#{}", r["name"].get!(tstring));
-        }*/
-        Variant directory = object["directory"];
-        if (directory.isA!(bool) && directory.get!(bool)) {
+            Stdout.formatln("#{}", r["absolute_path"].get!(tstring));
+        }
+        Variant type = object["type"];
+        if (type.isA!(tstring) && type.get!(tstring) == "directory") {
             if (++dirs % 1000 == 0) {
                 Stdout.formatln("{} dirs", dirs);
             }
-        } else {
+        } else if (type.isA!(tstring) && type.get!(tstring) == "file"){
             if (++files % 1000 == 0) {
                 Stdout.formatln("{} files", files);
             }
         }
-        //if (level >= 2)
-        //    return;
+        if (level >= 2)
+            return;
         try {
             foreach (child; &object.children) {
                 recurse(child, level + 1);

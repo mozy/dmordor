@@ -4,7 +4,9 @@ import tango.core.Variant;
 import tango.stdc.errno;
 import tango.stdc.posix.dirent;
 import tango.stdc.posix.unistd;
+import tango.stdc.posix.sys.stat;
 import tango.stdc.stringz;
+import tango.text.Util;
 
 import mordor.common.exception;
 import mordor.common.streams.file;
@@ -26,14 +28,21 @@ class PosixVFS : PosixDirectory, IVFS
 {
     this()
     {
-        super("/");
+        stat_t buf;
+        if (lstat("/\0", &buf) != 0) {
+            throw exceptionFromLastError();
+        }
+        super("/", &buf);
     }
-    
+
     Variant opIndex(string property)
     {
-        if (property == "name")
-            return Variant("posix");
-        return super[property];
+        switch (property) {
+            case "name":
+                return Variant("posix");
+            default:
+                return super[property];
+        }
     }
     void opIndexAssign(Variant value, string property)
     {
@@ -44,21 +53,118 @@ class PosixVFS : PosixDirectory, IVFS
     
     void _delete()
     { assert(false); }
+    
+    IObject find(string path)
+    {
+        if (path.length == 0 || path[0] != '/')
+            path = '/' ~ path;
+        if (path == "/")
+            return new PosixVFS();
+        // TODO: canonicalize
+        stat_t buf;
+        if (lstat(toStringz(path), &buf) != 0) {
+            throw exceptionFromLastError();
+        }
+        if (S_ISDIR(buf.st_mode)) {
+            return new PosixDirectory(path, &buf);
+        } else if (S_ISREG(buf.st_mode)){
+            return new PosixFile(path, &buf);
+        } else {
+            return null;
+        }
+    }
 }
 
-class PosixDirectory : IObject
+class PosixObject : IObject
 {
-    this(string path)
+    this(dirent* ent)
     {
-        _abspath = path;
-        // TODO: need to stat
+        _isDirent = true;
+        _dirent = *ent;
+        _name = nameFromDirent(&_dirent);        
     }
     
+    this(string path, stat_t* buf)
+    {
+        _isDirent = false;
+        _stat = *buf;
+        _abspath = path;
+        _name = _abspath[locatePrior(_abspath, '/') + 1..$];
+    }
+    
+    abstract int children(int delegate(ref IObject) dg);
+    abstract int references(int delegate(ref IObject) dg);
+
+    int properties(int delegate(ref string) dg) {
+        static string hidden = "hidden";
+        int ret;
+        if (_name.length > 0 && _name[0] == '.')
+            if ( (ret = dg(hidden)) != 0) return ret;        
+        foreach(p; _properties) {
+            if ( (ret = dg(p)) != 0) return ret;
+        }
+        return 0;
+    }
+    
+    Variant opIndex(string property)
+    {
+        switch (property) {
+            case "name":
+                return Variant(_name);
+            case "absolute_path":
+                return Variant(_abspath);
+            case "hidden":
+                return Variant(_name.length > 0 && _name[0] == '.');
+            default:
+                return Variant.init;
+        }
+    }
+
+    void opIndexAssign(Variant value, string property)
+    { assert(false); }
+    
+    abstract void _delete();
+    abstract Stream open();
+
+protected:
+    void ensureStat()
+    {
+        if (_isDirent) {
+            stat_t buf;
+            if (lstat(toStringz(_abspath), &buf) != 0)
+                throw exceptionFromLastError();
+            _stat = buf;
+            _isDirent = false;
+        }
+    }
+
+private:
+    static string[] _properties = ["name",
+                                   "absolute_path",
+                                   "type"];
+protected:
+    string _abspath;
+    string _name;
+    bool _isDirent;
+    union {
+        dirent _dirent;
+        stat_t _stat;
+    }
+}
+
+class PosixDirectory : PosixObject
+{    
     this(string parent, dirent* ent)
     {
-        _dirent = *ent;
-        _name = nameFromDirent(&_dirent);
+        super(ent);
         _abspath = parent ~ _name ~ "/";        
+    }
+    
+    this(string path, stat_t* buf)
+    {
+        super(path, buf);
+        if (_abspath[$-1] != '/')
+            _abspath ~= '/';
     }
 
     int children(int delegate(ref IObject) dg) {
@@ -76,9 +182,11 @@ class PosixDirectory : IObject
                 if (name == "." || name == "..")
                     continue;
                 object = new PosixDirectory(_abspath, ent);
-            } else {
+            } else if (ent.d_type == DT_REG) {
                 object = new PosixFile(_abspath, ent);
-            }
+            } else {
+                continue;
+            }           
             if ( (ret = dg(object)) != 0) return ret;
         }
         if (errno != 0)
@@ -86,35 +194,17 @@ class PosixDirectory : IObject
         return 0;
     }
     int references(int delegate(ref IObject) dg) { return 0; }
-    int properties(int delegate(ref string) dg) {
-        static string directory = "directory";
-        static string name = "name";
-        static string hidden = "hidden";
-        int ret;
-        if ( (ret = dg(directory)) != 0) return ret;
-        if ( (ret = dg(name)) != 0) return ret;
-        if (_name.length > 0 && _name[0] == '.')
-            if ( (ret = dg(hidden)) != 0) return ret;
-        return 0;
-    }
     
     Variant opIndex(string property)
     {
         switch (property) {
-            case "name":
-                return Variant(_name);
-            case "directory":
-                return Variant(true);
-            case "hidden":
-                return Variant(_name.length > 0 && _name[0] == '.');
+            case "type":
+                return Variant("directory");
             default:
-                return Variant.init;
+                return super[property];
         }
     }
-    
-    void opIndexAssign(Variant value, string property)
-    { assert(false); }
-    
+
     void _delete()
     {
         if (rmdir(toStringz(_abspath)) != 0) {
@@ -124,48 +214,44 @@ class PosixDirectory : IObject
     
     Stream open()
     { return null; }
-
-private:
-    string _abspath;
-    string _name;
-    dirent _dirent;
 }
 
-class PosixFile : IObject
+class PosixFile : PosixObject
 {    
     this(string parent, dirent* ent)
     {
-        _dirent = *ent;
-        _name = nameFromDirent(&_dirent);
+        super(ent);
         _abspath = parent ~ _name;        
+    }
+    
+    this(string path, stat_t* buf)
+    {
+        super(path, buf);
     }
 
     int children(int delegate(ref IObject) dg) { return 0; }
     int references(int delegate(ref IObject) dg) { return 0; }
-    int properties(int delegate(ref string) dg) {
-        static string name = "name";
-        static string hidden = "hidden";
+    int properties(int delegate(ref string) dg)
+    {
         int ret;
-        if ( (ret = dg(name)) != 0) return ret;
-        if (_name.length > 0 && _name[0] == '.')
-            if ( (ret = dg(hidden)) != 0) return ret;
-        return 0;            
+        foreach (p; _properties) {
+            if ( (ret = dg(p)) != 0) return ret;
+        }
+        return super.properties(dg);
     }
-    
+
     Variant opIndex(string property)
     {
         switch (property) {
-            case "name":
-                return Variant(_name);
-            case "hidden":
-                return Variant(_name.length > 0 && _name[0] == '.');
+            case "size":
+                ensureStat();
+                return Variant(_stat.st_size);
+            case "type":
+                return Variant("file");
             default:
-                return Variant.init;
+                return super[property];
         }
     }
-    
-    void opIndexAssign(Variant value, string property)
-    { assert(false); }
     
     void _delete()
     {
@@ -176,9 +262,7 @@ class PosixFile : IObject
     
     Stream open()
     { return new FileStream(_abspath); }
-
+    
 private:
-    string _abspath;
-    string _name;
-    dirent _dirent;
+    static string[] _properties = ["size"];
 }

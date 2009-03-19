@@ -7,6 +7,7 @@ import mordor.common.stringutils;
 
 interface IVFS : IObject
 {
+    IObject find(tstring path);
 }
 
 interface IObject

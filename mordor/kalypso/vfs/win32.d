@@ -2,6 +2,7 @@ module mordor.kalypso.vfs.win32;
 
 import tango.core.Variant;
 import tango.stdc.stringz;
+import tango.text.Util;
 import tango.util.log.Log;
 import win32.winbase;
 import win32.windef;
@@ -17,6 +18,18 @@ private Logger _log;
 static this()
 {
     _log = Log.lookup("mordor.kalypso.vfs.win32");
+}
+
+IObject createObject(wstring parent, WIN32_FIND_DATAW* findData)
+{
+    if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+        if (findData.cFileName[0..2] == ".\0" || findData.cFileName[0..3] == "..\0")
+            return null;
+        return new Win32Directory(parent, findData);
+    } else {
+        return new Win32File(parent, findData);
+    }
+    return null;    
 }
 
 class Win32VFS : IVFS
@@ -74,6 +87,23 @@ class Win32VFS : IVFS
     
     Stream open()
     { return null; }
+    
+    IObject find(wstring path) {
+        if (path.length == 0)
+            return new Win32VFS();
+        if (path.length < 4 || path[0..4] != r"\\?\")
+            path = r"\\?\" ~ path;
+        // TODO: figure out the volume it's mounted on, so we open just like
+        // we enumerate them
+        // TODO: canonicalize
+        WIN32_FIND_DATAW findData;
+        if (!GetFileAttributesExW(toString16z(path), GET_FILEEX_INFO_LEVELS.GetFileExInfoStandard, &findData)) {
+            throw exceptionFromLastError();
+        }
+        uint lastSlash = locatePrior(path, cast(wchar)'\\');
+        findData.cFileName[0..path.length-lastSlash] = path[lastSlash+1..$];
+        return createObject(path[0..lastSlash], &findData);
+    }
 }
 
 class Win32Volume : IObject
@@ -100,12 +130,9 @@ class Win32Volume : IObject
             throw exceptionFromLastError();
         scope (exit) FindClose(hFind);
         do {
-            IObject object;
-            if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-                object = new Win32Directory(_volume, &findData);
-            } else {
-                object = new Win32File(_volume, &findData);             
-            }
+            IObject object = createObject(_volume, &findData);
+            if (object is null)
+                continue;
             if ( (ret = dg(object)) != 0) return ret;
         } while (FindNextFileW(hFind, &findData))
         if (GetLastError() != ERROR_NO_MORE_FILES)
@@ -114,15 +141,25 @@ class Win32Volume : IObject
     }
     int references(int delegate(ref IObject) dg) { return 0; }
     int properties(int delegate(ref wstring) dg) {
-        static wstring name = "name";
-        return dg(name);
+        int ret;
+        foreach(p; _properties) {
+            if ( (ret = dg(p)) != 0) return ret;
+        }
+        return 0;
     }
     
     Variant opIndex(wstring property)
     {
-        if (property == "name")
-            return Variant(_volume[4..48]);
-        return Variant.init;
+        switch (property) {
+            case "name":
+                return Variant(_volume[4..48]);
+            case "absolute_path":
+                return Variant(_volume);
+            case "type":
+                return Variant("volume"w);
+            default:
+                return Variant.init;            
+        }
     }
     
     void opIndexAssign(Variant value, wstring property)
@@ -135,6 +172,9 @@ class Win32Volume : IObject
     { return null; }
 
 private:
+    static wstring[] _properties = ["name",
+                                    "absolute_path",
+                                    "type"];
     wstring _volume;
 }
 
@@ -164,23 +204,33 @@ class Win32MountPoint : IObject
     }
     
     int children(int delegate(ref IObject) dg) { return 0; }
-    int references(int delegate(ref IObject) dg) {
+    int references(int delegate(ref IObject) dg)
+    {
         if (_volume.length == 0)
             return 0;
         IObject volumeObject = new Win32Volume(_volume);
         return dg(volumeObject);
     }
-    int properties(int delegate(ref wstring) dg) {
-        static wstring name = "name";
-        return dg(name);
+    int properties(int delegate(ref wstring) dg)
+    {
+        int ret;
+        foreach(p; _properties) {
+            if ( (ret = dg(p)) != 0) return ret;
+        }
+        return 0;
     }
     
     Variant opIndex(wstring property)
     body
     {
-        if (property == "name")
-            return Variant(_root[0..$ - 1]);
-        return Variant.init;
+        switch (property) {
+            case "name":
+                return Variant(_root[0..$ - 1]);
+            case "type":
+                return Variant("mount"w);
+            default:
+                return Variant.init;
+        }
     }
     
     void opIndexAssign(Variant value, wstring property)
@@ -195,6 +245,8 @@ class Win32MountPoint : IObject
     { return null; }
     
 private:
+    static wstring[] _properties = ["name",
+                                    "type"];
     wstring _root;
     wstring _volume;
 }
@@ -215,6 +267,22 @@ class Win32Object : IObject
         foreach(p; _properties) {
             if ( (ret = dg(p)) != 0) return ret;
         }
+        if (_findData.dwFileAttributes & FILE_ATTRIBUTE_ARCHIVE)
+            if ( (ret = dg(_dynamicProperties[0])) != 0) return ret;
+        if (_findData.dwFileAttributes & FILE_ATTRIBUTE_COMPRESSED)
+            if ( (ret = dg(_dynamicProperties[1])) != 0) return ret;
+        if (_findData.dwFileAttributes & FILE_ATTRIBUTE_ENCRYPTED)
+            if ( (ret = dg(_dynamicProperties[2])) != 0) return ret;
+        if (_findData.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN)
+            if ( (ret = dg(_dynamicProperties[3])) != 0) return ret;
+        if (_findData.dwFileAttributes & FILE_ATTRIBUTE_NOT_CONTENT_INDEXED)
+            if ( (ret = dg(_dynamicProperties[4])) != 0) return ret;
+        if (_findData.dwFileAttributes & FILE_ATTRIBUTE_READONLY)
+            if ( (ret = dg(_dynamicProperties[5])) != 0) return ret;
+        if (_findData.dwFileAttributes & FILE_ATTRIBUTE_SYSTEM)
+            if ( (ret = dg(_dynamicProperties[6])) != 0) return ret;
+        if (_findData.dwFileAttributes & FILE_ATTRIBUTE_TEMPORARY)
+            if ( (ret = dg(_dynamicProperties[7])) != 0) return ret;
         return 0;
     }
     
@@ -223,22 +291,24 @@ class Win32Object : IObject
         switch (property) {
             case "name":
                 return Variant(_name);
+            case "absolute_path":
+                return Variant(_abspath);
             case "archive":
-                return Variant(!!(_findData.dwFileAttributes & FILE_ATTRIBUTE_ARCHIVE));
+                return _findData.dwFileAttributes & FILE_ATTRIBUTE_ARCHIVE ? Variant(true) : Variant.init;
             case "compressed":
-                return Variant(!!(_findData.dwFileAttributes & FILE_ATTRIBUTE_COMPRESSED));
+                return _findData.dwFileAttributes & FILE_ATTRIBUTE_COMPRESSED ? Variant(true) : Variant.init;
             case "encrypted":
-                return Variant(!!(_findData.dwFileAttributes & FILE_ATTRIBUTE_ENCRYPTED));
+                return _findData.dwFileAttributes & FILE_ATTRIBUTE_ENCRYPTED ? Variant(true) : Variant.init;
             case "hidden":
-                return Variant(!!(_findData.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN));
+                return _findData.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN ? Variant(true) : Variant.init;
             case "not_content_indexed":
-                return Variant(!!(_findData.dwFileAttributes & FILE_ATTRIBUTE_NOT_CONTENT_INDEXED));
+                return _findData.dwFileAttributes & FILE_ATTRIBUTE_NOT_CONTENT_INDEXED ? Variant(true) : Variant.init;
             case "read_only":
-                return Variant(!!(_findData.dwFileAttributes & FILE_ATTRIBUTE_READONLY));
+                return _findData.dwFileAttributes & FILE_ATTRIBUTE_READONLY ? Variant(true) : Variant.init;
             case "system":
-                return Variant(!!(_findData.dwFileAttributes & FILE_ATTRIBUTE_SYSTEM));
+                return _findData.dwFileAttributes & FILE_ATTRIBUTE_SYSTEM ? Variant(true) : Variant.init;
             case "temporary":
-                return Variant(!!(_findData.dwFileAttributes & FILE_ATTRIBUTE_TEMPORARY));
+                return _findData.dwFileAttributes & FILE_ATTRIBUTE_TEMPORARY ? Variant(true) : Variant.init;
             default:
                 return Variant.init;
         }
@@ -252,7 +322,10 @@ class Win32Object : IObject
 
 private:
     static wstring[] _properties = ["name",
-                                    "archive",
+                                    "absolute_path",
+                                    "type"];
+    static wstring[] _dynamicProperties = 
+                                   ["archive",
                                     "compressed",
                                     "encrypted",
                                     "hidden",
@@ -260,10 +333,9 @@ private:
                                     "read_only",
                                     "system",
                                     "temporary"];
+protected:
     wstring _name;
     WIN32_FIND_DATAW _findData;
-    
-protected:
     wstring _abspath;
 }
 
@@ -284,14 +356,9 @@ class Win32Directory : Win32Object
             throw exceptionFromLastError();
         scope (exit) FindClose(hFind);
         do {
-            IObject object;
-            if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-                if (findData.cFileName[0..2] == ".\0" || findData.cFileName[0..3] == "..\0")
-                    continue;
-                object = new Win32Directory(_abspath[0..$-1], &findData);
-            } else {
-                object = new Win32File(_abspath[0..$-1], &findData);
-            }
+            IObject object = createObject(_abspath[0..$-1], &findData);
+            if (object is null)
+                continue;
             if ( (ret = dg(object)) != 0) return ret;
         } while (FindNextFileW(hFind, &findData))
         if (GetLastError() != ERROR_NO_MORE_FILES)
@@ -299,18 +366,17 @@ class Win32Directory : Win32Object
         return 0;
     }
     int references(int delegate(ref IObject) dg) { return 0; }
-    int properties(int delegate(ref wstring) dg) {
-        int ret;
-        static wstring directory = "directory";
-        if ( (ret = dg(directory)) != 0) return ret;
-        return super.properties(dg);
-    }
     
     Variant opIndex(wstring property)
     {
-        if (property == "directory")
-            return Variant(true);
-        return super[property];
+        switch (property) {
+            case "type":
+                return Variant("directory"w);
+            case "absolute_path":
+                return Variant(_abspath[0..$-1]);
+            default:
+                return super[property];
+        }
     }
     
     void _delete()
@@ -333,12 +399,34 @@ class Win32File : Win32Object
         _abspath = parent ~ _name;
     }
     
-    int children(int delegate(ref IObject) dg) {
+    int children(int delegate(ref IObject) dg)
+    {
         // TODO: enum ADS
         return 0;
     }
-    int references(int delegate(ref IObject) dg) {
+    int references(int delegate(ref IObject) dg)
+    {
         return children(dg);
+    }
+    int properties(int delegate(ref wstring) dg)
+    {
+        int ret;
+        foreach (p; _properties) {
+            if ( (ret = dg(p)) != 0) return ret;
+        }
+        return super.properties(dg);
+    }
+    
+    Variant opIndex(wstring property)
+    {
+        switch (property) {
+            case "size":
+                return Variant((cast(long)_findData.nFileSizeHigh << 32) | cast(long)_findData.nFileSizeLow);
+            case "type":
+                return Variant("file"w);
+            default:
+                return super[property];
+        }
     }
     
     void _delete()
@@ -352,4 +440,7 @@ class Win32File : Win32Object
     {
         return new FileStream(_abspath);
     }
+
+private:
+    static wstring _properties = ["size"];
 }
