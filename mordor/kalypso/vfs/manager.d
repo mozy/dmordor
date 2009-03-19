@@ -1,10 +1,12 @@
 module mordor.kalypso.vfs.manager;
 
-version (Posix) import mordor.kalypso.vfs.posix;
-version (Windows) import mordor.kalypso.vfs.win32;
+import tango.text.Util;
 
+import mordor.common.exception;
 import mordor.common.stringutils;
 public import mordor.kalypso.vfs.model;
+version (Posix) import mordor.kalypso.vfs.posix;
+version (Windows) import mordor.kalypso.vfs.win32;
 
 class VFSManager
 {
@@ -27,6 +29,34 @@ public:
             if ( (ret = dg(vfs)) != 0) return ret;
         }
         return 0;
+    }
+    
+    IObject find(tstring path)
+    {
+        if (path.length == 0)
+            return null;
+        if (path[0] == '/')
+            path = path[1..$];
+        if (path.length >=6 && path[0..6] == "native") {
+            version (Windows) {
+                path = "win32" ~ path[6..$];
+            } else version (Posix) {
+                path = "posix" ~ path[6..$];
+            }
+        }
+
+        tstring firstComponent = path[0..locate(path, cast(tchar)'/')];
+        tstring remainder = path[firstComponent.length..$];
+        foreach(vfs; _vfss) {
+            if (vfs["name"].get!(tstring) == firstComponent) {
+                if (remainder.length == 0)
+                    return vfs;
+                else
+                    return vfs.find(remainder);
+            }
+        }
+        
+        throw new FileNotFoundException();
     }
     
 private:

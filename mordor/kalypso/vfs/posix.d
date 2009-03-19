@@ -10,13 +10,15 @@ import tango.text.Util;
 import tango.time.Time;
 
 import mordor.common.exception;
+version (linux) import mordor.common.iomanager;
 import mordor.common.streams.file;
 import mordor.common.streams.stream;
 import mordor.common.stringutils;
+version (linux) import mordor.kalypso.vfs.inotify;
 import mordor.kalypso.vfs.model;
 
 // helper functions
-string nameFromDirent(dirent* ent)
+private string nameFromDirent(dirent* ent)
 {
     version (linux) {
         return fromStringz(ent.d_name.ptr);
@@ -33,7 +35,13 @@ private Time convert (time_t time, uint nsec)
     return Time.epoch1970 + TimeSpan(t);
 }
 
-class PosixVFS : PosixDirectory, IVFS
+version (linux) {
+    private alias IWatchableVFS IVFSOnThisPlatform;
+} else {
+    private alias IVFS IVFSOnThisPlatform;
+}
+
+class PosixVFS : PosixDirectory, IVFSOnThisPlatform
 {
     this()
     {
@@ -80,6 +88,13 @@ class PosixVFS : PosixDirectory, IVFS
             return new PosixFile(path, &buf);
         } else {
             return null;
+        }
+    }
+    
+    version (linux) {
+        IWatcher getWatcher(IOManager ioManager, void delegate(string, IWatcher.Events) dg)
+        {
+            return new InotifyWatcher(ioManager, dg);
         }
     }
 }

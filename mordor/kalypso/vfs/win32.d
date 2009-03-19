@@ -9,10 +9,12 @@ import win32.winbase;
 import win32.windef;
 
 import mordor.common.exception;
+import mordor.common.iomanager;
 import mordor.common.streams.file;
 import mordor.common.streams.stream;
 import mordor.common.stringutils;
 import mordor.kalypso.vfs.model;
+import mordor.kalypso.vfs.readdirectorychangesw;
 
 private Logger _log;
 
@@ -40,7 +42,7 @@ private Time convert (FILETIME time)
     return Time.epoch1601 + TimeSpan(t);
 }
 
-class Win32VFS : IVFS
+class Win32VFS : IVFS, IWatchableVFS
 {
     int children(int delegate(ref IObject) dg) {
         wchar[50] volume;
@@ -111,6 +113,11 @@ class Win32VFS : IVFS
         uint lastSlash = locatePrior(path, cast(wchar)'\\');
         findData.cFileName[0..path.length-lastSlash] = path[lastSlash+1..$];
         return createObject(path[0..lastSlash], &findData);
+    }
+    
+    IWatcher getWatcher(IOManager ioManager, void delegate(wstring, IWatcher.Events) dg)
+    {
+        return new ReadDirectoryChangesWWatcher(ioManager, dg);
     }
 }
 

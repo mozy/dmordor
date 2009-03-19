@@ -139,5 +139,31 @@ Exception exceptionFromLastError(char[] msg = "")
 
 Exception exceptionFromLastError(int error, char[] msg = "")
 {
-    return new NativeException(error, msg);
+    version (Windows) {
+        switch (error) {
+            case ERROR_FILE_NOT_FOUND:
+                return new FileNotFoundException(msg);
+            default:
+                return new NativeException(error, msg);
+        }
+    } else {
+        switch (error) {
+            case ENOENT:
+                return new FileNotFoundException(msg);
+            default:
+                return new NativeException(error, msg);
+        }
+    }
+}
+
+class FileNotFoundException : NativeException
+{
+    this(char[] msg = "")
+    {
+        version (Windows) {
+            super(ERROR_FILE_NOT_FOUND, msg);
+        } else {
+            super(ENOENT, msg);
+        }
+    }
 }

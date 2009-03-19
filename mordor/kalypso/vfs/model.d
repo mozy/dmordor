@@ -1,13 +1,25 @@
 module mordor.kalypso.vfs.model;
 
 import tango.core.Variant;
+import tango.time.Time;
 
+import mordor.common.iomanager;
 import mordor.common.streams.stream;
 import mordor.common.stringutils;
 
 interface IVFS : IObject
 {
     IObject find(tstring path);
+}
+
+interface ISnapshottableVFS : IVFS
+{
+    IVFS snapshot(out Time timestamp);
+}
+
+interface IVersionedVFS : IVFS
+{
+    IVFS openVersionAtTimestamp(Time timestamp);
 }
 
 interface IObject
@@ -19,6 +31,12 @@ interface IObject
     void opIndexAssign(Variant value, tstring property);
     void _delete();
     Stream open();
+}
+
+interface IVersionedObject
+{
+    int versions(int delegate(ref Time) dg);
+    IObject openVersionAtTimestamp(Time timestamp);
 }
 
 interface IWatcher
@@ -64,4 +82,9 @@ interface IWatcher
     Events supportedEvents();
 
     void watch(tstring path, Events events);
+}
+
+interface IWatchableVFS : IVFS
+{
+    IWatcher getWatcher(IOManager ioManager, void delegate(tstring, IWatcher.Events));
 }

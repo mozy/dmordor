@@ -22,27 +22,17 @@ static this()
 
 class InotifyWatcher : IWatcher
 {
-private:
-    this(IOManager ioManager)
+public:
+    this(IOManager ioManager, void delegate(string, Events) dg)
     {
+        _dg = dg;
         _fd = inotify_init();
         if (_fd < 0)
             throw exceptionFromLastError();
         _inotifyStream = new BufferedStream(new FDStream(ioManager, _fd));
         ioManager.schedule(new Fiber(&this.run));
     }
-public:
-    this(IOManager ioManager, void delegate(string, Events) dg)
-    {
-        this(ioManager);
-        _dg = dg;
-    }
     
-    this(IOManager ioManager, void function(string, Events) fn)
-    {
-        this(ioManager);
-        _fn = fn;
-    }
     // no ~this; FDStream owns the fd
     
     Events supportedEvents()
@@ -103,10 +93,7 @@ private:
             
             if (event.wd == -1) {
                 assert(event.mask == IN_Q_OVERFLOW);
-                if (_dg !is null)
-                    _dg("", Events.EventsDropped);
-                if (_fn !is null)
-                    _fn("", Events.EventsDropped);
+                _dg("", Events.EventsDropped);
                 continue;
             }
             
@@ -141,10 +128,7 @@ private:
             string absPath = details.path;
             if (filename.length > 0)
                 absPath ~= '/' ~ filename;
-            if (_dg !is null)
-                _dg(absPath, events);
-            if (_fn !is null)
-                _fn(absPath, events);
+            _dg(absPath, events);
         }
     }
 
@@ -198,5 +182,4 @@ private:
     int[string] _pathToWd;
     Stream _inotifyStream;
     void delegate(string, Events) _dg;
-    void function(string, Events) _fn;
 }

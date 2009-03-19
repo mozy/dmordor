@@ -18,12 +18,6 @@ class ReadDirectoryChangesWWatcher : IWatcher
         _dg = dg;
     }
     
-    this(IOManager ioManager, void function(wstring, Events) fn)
-    {
-        _ioManager = ioManager;
-        _fn = fn;
-    }
-    
     ~this()
     {
         foreach(worker; _handleToWorker) {
@@ -79,10 +73,7 @@ class ReadDirectoryChangesWWatcher : IWatcher
                 _ioManager.registerEvent(&event);
                 if (!ReadDirectoryChangesW(hDir, buffer.ptr, buffer.length, watchSubtree, filter, NULL, &event.overlapped, NULL)) {
                     if (GetLastError() == ERROR_NOTIFY_ENUM_DIR) {
-                        if (_dg !is null)
-                            _dg("", Events.EventsDropped);
-                        if (_fn !is null)
-                            _fn("", Events.EventsDropped);
+                        _dg("", Events.EventsDropped);
                         continue;
                     } else if (GetLastError() != ERROR_IO_PENDING) {
                         throw exceptionFromLastError();
@@ -91,10 +82,7 @@ class ReadDirectoryChangesWWatcher : IWatcher
                 Fiber.yield();
                 if (!event.ret) {
                     if (event.lastError == ERROR_NOTIFY_ENUM_DIR) {
-                        if (_dg !is null)
-                            _dg("", Events.EventsDropped);
-                        if (_fn !is null)
-                            _fn("", Events.EventsDropped);
+                        _dg("", Events.EventsDropped);
                         continue;
                     } else {
                         throw exceptionFromLastError(event.lastError);
@@ -123,10 +111,7 @@ class ReadDirectoryChangesWWatcher : IWatcher
                     }
                     // TODO: normalize path (it may not be in the correct case)
                     wstring absPath = path ~ pNotification.FileName[0..pNotification.FileNameLength / wchar.sizeof];
-                    if (_dg !is null)
-                        _dg(absPath, events);
-                    if (_fn !is null)
-                        _fn(absPath, events);
+                    _dg(absPath, events);
                     if (pNotification.NextEntryOffset == 0)
                         break;
                     pNotification = cast(FILE_NOTIFY_INFORMATION*)(cast(void*)pNotification + pNotification.NextEntryOffset);
@@ -174,5 +159,4 @@ private:
     Worker[HANDLE] _handleToWorker;
     HANDLE[string] _pathToHandle;
     void delegate(wstring, Events) _dg;
-    void function(wstring, Events) _fn;
 }
