@@ -7,6 +7,7 @@ import tango.stdc.posix.unistd;
 import tango.stdc.posix.sys.stat;
 import tango.stdc.stringz;
 import tango.text.Util;
+import tango.time.Time;
 
 import mordor.common.exception;
 import mordor.common.streams.file;
@@ -14,7 +15,7 @@ import mordor.common.streams.stream;
 import mordor.common.stringutils;
 import mordor.kalypso.vfs.model;
 
-// helper function
+// helper functions
 string nameFromDirent(dirent* ent)
 {
     version (linux) {
@@ -22,6 +23,14 @@ string nameFromDirent(dirent* ent)
     } else {
         return ent.d_name[0..ent.d_namlen];
     }
+}
+
+private Time convert (time_t time, uint nsec)
+{
+    long t = time;
+    t *= TimeSpan.TicksPerSecond;
+    t += nsec / TimeSpan.NanosecondsPerTick;
+    return Time.epoch1970 + TimeSpan(t);
 }
 
 class PosixVFS : PosixDirectory, IVFS
@@ -103,6 +112,9 @@ class PosixObject : IObject
         foreach(p; _properties) {
             if ( (ret = dg(p)) != 0) return ret;
         }
+        foreach(p; _nativeProperties) {
+            if ( (ret = dg(p)) != 0) return ret;
+        }
         return 0;
     }
     
@@ -115,6 +127,16 @@ class PosixObject : IObject
                 return Variant(_abspath);
             case "hidden":
                 return Variant(_name.length > 0 && _name[0] == '.');
+            case "access_time":
+                return Variant(convert(_stat.st_atime, _stat.st_atimensec));
+            case "change_time":
+                return Variant(convert(_stat.st_ctime, _stat.st_ctimensec));
+version (freebsd) {
+            case "creation_time":
+                return Variant(convert(_stat.st_birthtimespec.tv_sec, _stat.st_birthtimespec.tv_nsec));
+}
+            case "modification_time":
+                return Variant(convert(_stat.st_mtime, _stat.st_mtimensec));
             default:
                 return Variant.init;
         }
@@ -141,7 +163,15 @@ protected:
 private:
     static string[] _properties = ["name",
                                    "absolute_path",
-                                   "type"];
+                                   "type",
+                                   "access_time",
+                                   "change_time",
+                                   "modification_time"];
+    version (freebsd) {
+        static string[] _nativeProperties = ["creation_time"];
+    } else {
+        static string[] _nativeProperties;
+    }
 protected:
     string _abspath;
     string _name;

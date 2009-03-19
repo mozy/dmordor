@@ -3,6 +3,7 @@ module mordor.kalypso.vfs.win32;
 import tango.core.Variant;
 import tango.stdc.stringz;
 import tango.text.Util;
+import tango.time.Time;
 import tango.util.log.Log;
 import win32.winbase;
 import win32.windef;
@@ -30,6 +31,13 @@ private IObject createObject(wstring parent, WIN32_FIND_DATAW* findData)
         return new Win32File(parent, findData);
     }
     return null;    
+}
+
+private Time convert (FILETIME time)
+{
+    auto t = *cast(long*) &time;
+    t *= 100 / TimeSpan.NanosecondsPerTick;
+    return Time.epoch1601 + TimeSpan(t);
 }
 
 class Win32VFS : IVFS
@@ -283,6 +291,12 @@ class Win32Object : IObject
             if ( (ret = dg(_dynamicProperties[6])) != 0) return ret;
         if (_findData.dwFileAttributes & FILE_ATTRIBUTE_TEMPORARY)
             if ( (ret = dg(_dynamicProperties[7])) != 0) return ret;
+        if ((cast(LARGE_INTEGER)_findData.ftLastAccessTime).QuadPart != 0)
+            if ( (ret = dg(_dynamicProperties[8])) != 0) return ret;
+        if ((cast(LARGE_INTEGER)_findData.ftCreationTime).QuadPart != 0)
+            if ( (ret = dg(_dynamicProperties[9])) != 0) return ret;
+        if ((cast(LARGE_INTEGER)_findData.ftLastWriteTime).QuadPart != 0)
+            if ( (ret = dg(_dynamicProperties[10])) != 0) return ret;
         return 0;
     }
     
@@ -309,6 +323,12 @@ class Win32Object : IObject
                 return _findData.dwFileAttributes & FILE_ATTRIBUTE_SYSTEM ? Variant(true) : Variant.init;
             case "temporary":
                 return _findData.dwFileAttributes & FILE_ATTRIBUTE_TEMPORARY ? Variant(true) : Variant.init;
+            case "access_time":
+                return (cast(LARGE_INTEGER)_findData.ftLastAccessTime).QuadPart != 0 ? Variant(convert(_findData.ftLastAccessTime)) : Variant.init;
+            case "creation_time":
+                return (cast(LARGE_INTEGER)_findData.ftCreationTime).QuadPart != 0 ? Variant(convert(_findData.ftCreationTime)) : Variant.init;
+            case "modification_time":
+                return (cast(LARGE_INTEGER)_findData.ftLastWriteTime).QuadPart != 0 ? Variant(convert(_findData.ftLastWriteTime)) : Variant.init;
             default:
                 return Variant.init;
         }
@@ -332,7 +352,10 @@ private:
                                     "not_content_indexed",
                                     "read_only",
                                     "system",
-                                    "temporary"];
+                                    "temporary",
+                                    "access_time",
+                                    "creation_time",
+                                    "modification_time"];
 protected:
     wstring _name;
     WIN32_FIND_DATAW _findData;
@@ -442,5 +465,5 @@ class Win32File : Win32Object
     }
 
 private:
-    static wstring _properties = ["size"];
+    static wstring[] _properties = ["size"];
 }

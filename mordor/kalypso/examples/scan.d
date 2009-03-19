@@ -1,6 +1,8 @@
 module mordor.kalypso.examples.scan;
 
 import tango.core.Variant;
+import tango.text.convert.TimeStamp;
+import tango.time.Time;
 import tango.util.log.AppendConsole;
 import tango.io.Stdout;
 
@@ -33,6 +35,8 @@ void main()
                 Stdout.formatln("@{} = {}", p, v.get!(bool));
             else if (v.isA!(long))
                 Stdout.formatln("@{} = {}", p, v.get!(long));
+            else if (v.isA!(Time))
+                Stdout.formatln("@{} = {}", p, toString(v.get!(Time)));
             else
                 Stdout.formatln("@{} ({})", p, v);
         }
