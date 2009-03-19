@@ -20,7 +20,7 @@ static this()
     _log = Log.lookup("mordor.kalypso.vfs.win32");
 }
 
-IObject createObject(wstring parent, WIN32_FIND_DATAW* findData)
+private IObject createObject(wstring parent, WIN32_FIND_DATAW* findData)
 {
     if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
         if (findData.cFileName[0..2] == ".\0" || findData.cFileName[0..3] == "..\0")
