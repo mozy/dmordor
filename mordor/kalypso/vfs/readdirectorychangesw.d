@@ -1,6 +1,7 @@
 module mordor.kalypso.vfs.readdirectorychangesw;
 
 import tango.stdc.stringz;
+import tango.text.convert.Utf;
 import tango.util.log.Log;
 import win32.winbase;
 import win32.winnt;
@@ -13,7 +14,7 @@ import mordor.kalypso.vfs.model;
 
 class ReadDirectoryChangesWWatcher : IWatcher
 {
-    this(IOManager ioManager, void delegate(wstring, Events) dg)
+    this(IOManager ioManager, void delegate(string, Events) dg)
     {
         _ioManager = ioManager;
         _dg = dg;
@@ -38,7 +39,7 @@ class ReadDirectoryChangesWWatcher : IWatcher
     private class Worker
     {
         HANDLE hDir;
-        wstring path;
+        string path;
         Events events;
         void[64 * 1024] buffer = void;
         AsyncEvent event;
@@ -111,7 +112,7 @@ class ReadDirectoryChangesWWatcher : IWatcher
                             break;
                     }
                     // TODO: normalize path (it may not be in the correct case)
-                    wstring absPath = path ~ pNotification.FileName[0..pNotification.FileNameLength / wchar.sizeof];
+                    string absPath = path ~ tango.text.convert.Utf.toString(pNotification.FileName[0..pNotification.FileNameLength / wchar.sizeof]);
                     _dg(absPath, events);
                     if (pNotification.NextEntryOffset == 0)
                         break;
@@ -126,9 +127,9 @@ class ReadDirectoryChangesWWatcher : IWatcher
     void watch(IObject object, Events events)
     in
     {
-        assert(object["type"].isA!(wstring));
-        assert(object["type"].get!(wstring) == "directory" ||
-               object["type"].get!(wstring) == "volume");
+        assert(object["type"].isA!(string));
+        assert(object["type"].get!(string) == "directory" ||
+               object["type"].get!(string) == "volume");
     }
     body
     {
@@ -150,14 +151,9 @@ class ReadDirectoryChangesWWatcher : IWatcher
         _ioManager.schedule(new Fiber(&worker.run));
     }
     
-private:
-    struct WatchDetails {
-        wstring path;
-        Events events;
-    }
-    
+private:    
     IOManager _ioManager;
     Worker[HANDLE] _handleToWorker;
     HANDLE[string] _pathToHandle;
-    void delegate(wstring, Events) _dg;
+    void delegate(string, Events) _dg;
 }

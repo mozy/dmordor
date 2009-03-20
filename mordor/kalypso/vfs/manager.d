@@ -31,7 +31,7 @@ public:
         return 0;
     }
     
-    IObject find(tstring path)
+    IObject find(string path)
     {
         if (path.length == 0)
             return null;
@@ -45,10 +45,10 @@ public:
             }
         }
 
-        tstring firstComponent = path[0..locate(path, cast(tchar)'/')];
-        tstring remainder = path[firstComponent.length..$];
+        string firstComponent = path[0..locate(path, '/')];
+        string remainder = path[firstComponent.length..$];
         foreach(vfs; _vfss) {
-            if (vfs["name"].get!(tstring) == firstComponent) {
+            if (vfs["name"].get!(string) == firstComponent) {
                 if (remainder.length == 0)
                     return vfs;
                 else

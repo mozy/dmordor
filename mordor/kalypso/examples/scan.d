@@ -22,15 +22,15 @@ void main()
     void recurse(IObject object, int level) {
         for(int i = 0; i < level * 4; ++i)
             Stdout.format(" ");
-        Stdout.formatln("{}", object["name"].get!(tstring));
+        Stdout.formatln("{}", object["name"].get!(string));
         foreach(p; &object.properties) {
             if (p == "name")
                 continue;
             for(int i = 0; i < (level + 1) * 4; ++i)
                 Stdout.format(" ");
             Variant v = object[p];
-            if (v.isA!(tstring))
-                Stdout.formatln("@{} = {}", p, v.get!(tstring));
+            if (v.isA!(string))
+                Stdout.formatln("@{} = {}", p, v.get!(string));
             else if (v.isA!(bool))
                 Stdout.formatln("@{} = {}", p, v.get!(bool));
             else if (v.isA!(long))
@@ -46,11 +46,11 @@ void main()
             Stdout.formatln("#{}", r["absolute_path"].get!(tstring));
         }
         Variant type = object["type"];
-        if (type.isA!(tstring) && type.get!(tstring) == "directory") {
+        if (type.isA!(string) && type.get!(string) == "directory") {
             if (++dirs % 1000 == 0) {
                 Stdout.formatln("{} dirs", dirs);
             }
-        } else if (type.isA!(tstring) && type.get!(tstring) == "file"){
+        } else if (type.isA!(string) && type.get!(string) == "file"){
             if (++files % 1000 == 0) {
                 Stdout.formatln("{} files", files);
             }

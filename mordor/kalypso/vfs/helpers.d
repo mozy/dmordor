@@ -3,19 +3,19 @@ module mordor.kalypso.vfs.helpers;
 import mordor.common.stringutils;
 import mordor.kalypso.vfs.model;
 
-tstring getFullPath(IObject object)
+string getFullPath(IObject object)
 {
     size_t totalLength;
     size_t writtenTo;
     IObject copy = object;
-    tstring ret;
+    string ret;
     
     void recurse(IObject object) {
         if (object is null) {
             ret.length = totalLength;
             return;
         }
-        tstring thisName = object["name"].get!(tstring);
+        string thisName = object["name"].get!(string);
         totalLength += thisName.length + 1;
         recurse(object.parent);
         ret[writtenTo++] = '/';

@@ -9,7 +9,7 @@ import mordor.common.stringutils;
 
 interface IVFS : IObject
 {
-    IObject find(tstring path);
+    IObject find(string path);
 }
 
 interface ISnapshottableVFS : IVFS
@@ -27,9 +27,9 @@ interface IObject
     IObject parent();
     int children(int delegate(ref IObject) dg);
     int references(int delegate(ref IObject) dg);
-    int properties(int delegate(ref tstring) dg);
-    Variant opIndex(tstring property);
-    void opIndexAssign(Variant value, tstring property);
+    int properties(int delegate(ref string) dg);
+    Variant opIndex(string property);
+    void opIndexAssign(Variant value, string property);
     void _delete();
     Stream open();
 }
@@ -86,5 +86,5 @@ interface IWatcher
 
 interface IWatchableVFS : IVFS
 {
-    IWatcher getWatcher(IOManager ioManager, void delegate(tstring, IWatcher.Events));
+    IWatcher getWatcher(IOManager ioManager, void delegate(string, IWatcher.Events));
 }

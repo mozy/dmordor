@@ -2,6 +2,7 @@ module mordor.kalypso.vfs.win32;
 
 import tango.core.Variant;
 import tango.stdc.stringz;
+import tango.text.convert.Utf;
 import tango.text.Util;
 import tango.time.Time;
 import tango.util.log.Log;
@@ -236,24 +237,27 @@ class Win32VFS : IVFS, IWatchableVFS
         return 0;
     }
     int references(int delegate(ref IObject) dg) { return 0; }
-    int properties(int delegate(ref wstring) dg) {
-        static wstring name = "name";
-        return dg(name);
+    int properties(int delegate(ref string) dg) {
+        int ret;
+        foreach(p; _properties) {
+            if ( (ret = dg(p)) != 0) return ret;
+        }
+        return 0;
     }
 
-    Variant opIndex(wstring property)
+    Variant opIndex(string property)
     {
         switch (property) {
             case "name":
-                return Variant("win32"w);
+                return Variant("win32");
             case "type":
-                return Variant("vfs"w);
+                return Variant("vfs");
             default:
                 return Variant.init;
         }
     }
     
-    void opIndexAssign(Variant value, wstring property)
+    void opIndexAssign(Variant value, string property)
     { assert(false); }
     
     void _delete()
@@ -262,14 +266,18 @@ class Win32VFS : IVFS, IWatchableVFS
     Stream open()
     { return null; }
     
-    IObject find(wstring path) {
-        return .find(path);
+    IObject find(string path) {
+        return .find(toString16(path));
     }
     
-    IWatcher getWatcher(IOManager ioManager, void delegate(wstring, IWatcher.Events) dg)
+    IWatcher getWatcher(IOManager ioManager, void delegate(string, IWatcher.Events) dg)
     {
         return new ReadDirectoryChangesWWatcher(ioManager, dg);
     }
+
+private:
+    static string[] _properties = ["name",
+                                   "type"];
 }
 
 class Win32Volume : IObject
@@ -309,7 +317,7 @@ class Win32Volume : IObject
         return 0;
     }
     int references(int delegate(ref IObject) dg) { return 0; }
-    int properties(int delegate(ref wstring) dg) {
+    int properties(int delegate(ref string) dg) {
         int ret;
         foreach(p; _properties) {
             if ( (ret = dg(p)) != 0) return ret;
@@ -317,21 +325,21 @@ class Win32Volume : IObject
         return 0;
     }
     
-    Variant opIndex(wstring property)
+    Variant opIndex(string property)
     {
         switch (property) {
             case "name":
-                return Variant(_volume[4..48]);
+                return Variant(tango.text.convert.Utf.toString(_volume[4..48]));
             case "absolute_path":
                 return Variant(_volume);
             case "type":
-                return Variant("volume"w);
+                return Variant("volume");
             default:
                 return Variant.init;            
         }
     }
     
-    void opIndexAssign(Variant value, wstring property)
+    void opIndexAssign(Variant value, string property)
     { assert(false); }
     
     void _delete()
@@ -341,7 +349,7 @@ class Win32Volume : IObject
     { return null; }
 
 private:
-    static wstring[] _properties = ["name",
+    static string[] _properties = ["name",
                                     "absolute_path",
                                     "type"];
     wstring _volume;
@@ -372,7 +380,7 @@ class Win32Drive : IObject
         return dg(targetObject);
     }
 
-    int properties(int delegate(ref wstring) dg)
+    int properties(int delegate(ref string) dg)
     {
         int ret;
         foreach(p; _properties) {
@@ -381,15 +389,15 @@ class Win32Drive : IObject
         return 0;
     }
     
-    Variant opIndex(wstring property)
+    Variant opIndex(string property)
     body
     {
         switch (property) {
             case "name":
             case "absolute_path":
-                return Variant(_drive);
+                return Variant(tango.text.convert.Utf.toString(_drive));
             case "type":
-                return Variant("link"w);
+                return Variant("link");
             case "target":
                 if (_target.length == 0) {
                     _target = resolveDrive(_drive);
@@ -400,7 +408,7 @@ class Win32Drive : IObject
         }
     }
     
-    void opIndexAssign(Variant value, wstring property)
+    void opIndexAssign(Variant value, string property)
     {
         assert(false);
     }
@@ -412,10 +420,10 @@ class Win32Drive : IObject
     { return null; }
     
 private:
-    static wstring[] _properties = ["name",
-                                    "absolute_path",
-                                    "type",
-                                    "target"];
+    static string[] _properties = ["name",
+                                   "absolute_path",
+                                   "type",
+                                   "target"];
     wstring _drive;
     wstring _target;
 }
@@ -455,7 +463,7 @@ class Win32UNCShare : IObject
         return 0;
     }
     int references(int delegate(ref IObject) dg) { return 0; }
-    int properties(int delegate(ref wstring) dg) {
+    int properties(int delegate(ref string) dg) {
         int ret;
         foreach(p; _properties) {
             if ( (ret = dg(p)) != 0) return ret;
@@ -463,21 +471,21 @@ class Win32UNCShare : IObject
         return 0;
     }
     
-    Variant opIndex(wstring property)
+    Variant opIndex(string property)
     {
         switch (property) {
             case "name":
-                return Variant(_serverAndShare[8..$-2]);
+                return Variant(tango.text.convert.Utf.toString(_serverAndShare[8..$-2]));
             case "absolute_path":
                 return Variant(_serverAndShare[0..$-1]);
             case "type":
-                return Variant("volume"w);
+                return Variant("volume");
             default:
                 return Variant.init;            
         }
     }
     
-    void opIndexAssign(Variant value, wstring property)
+    void opIndexAssign(Variant value, string property)
     { assert(false); }
     
     void _delete()
@@ -487,9 +495,9 @@ class Win32UNCShare : IObject
     { return null; }
 
 private:
-    static wstring[] _properties = ["name",
-                                    "absolute_path",
-                                    "type"];
+    static string[] _properties = ["name",
+                                   "absolute_path",
+                                   "type"];
     wstring _serverAndShare;    
 }
 
@@ -498,7 +506,7 @@ class Win32Object : IObject
     this(WIN32_FILE_ATTRIBUTE_DATA* findData, wstring name)
     {
         _findData = *findData;
-        _name = name;
+        _name = tango.text.convert.Utf.toString(name);
     }
 
     IObject parent()
@@ -508,7 +516,7 @@ class Win32Object : IObject
     abstract int children(int delegate(ref IObject) dg);
     abstract int references(int delegate(ref IObject) dg);
 
-    int properties(int delegate(ref wstring) dg) {
+    int properties(int delegate(ref string) dg) {
         int ret;
         foreach(p; _properties) {
             if ( (ret = dg(p)) != 0) return ret;
@@ -538,7 +546,7 @@ class Win32Object : IObject
         return 0;
     }
     
-    Variant opIndex(wstring property)
+    Variant opIndex(string property)
     {
         switch (property) {
             case "name":
@@ -572,7 +580,7 @@ class Win32Object : IObject
         }
     }
     
-    void opIndexAssign(Variant value, wstring property)
+    void opIndexAssign(Variant value, string property)
     { assert(false); }
     
     abstract void _delete();
@@ -582,23 +590,23 @@ protected:
     wstring abspath() { return _abspath; }
 
 private:
-    static wstring[] _properties = ["name",
-                                    "absolute_path",
-                                    "type"];
-    static wstring[] _dynamicProperties = 
-                                   ["archive",
-                                    "compressed",
-                                    "encrypted",
-                                    "hidden",
-                                    "not_content_indexed",
-                                    "read_only",
-                                    "system",
-                                    "temporary",
-                                    "access_time",
-                                    "creation_time",
-                                    "modification_time"];
+    static string[] _properties = ["name",
+                                   "absolute_path",
+                                   "type"];
+    static string[] _dynamicProperties = 
+                                  ["archive",
+                                   "compressed",
+                                   "encrypted",
+                                   "hidden",
+                                   "not_content_indexed",
+                                   "read_only",
+                                   "system",
+                                   "temporary",
+                                   "access_time",
+                                   "creation_time",
+                                   "modification_time"];
 protected:
-    wstring _name;
+    string _name;
     WIN32_FILE_ATTRIBUTE_DATA _findData;
     wstring _abspath;
 }
@@ -608,7 +616,7 @@ class Win32Directory : Win32Object
     this(wstring parent, WIN32_FILE_ATTRIBUTE_DATA* findData, wstring name)
     {
         super(findData, name);
-        _abspath = parent ~ r"\" ~ _name ~ r"\*";
+        _abspath = parent ~ r"\" ~ name ~ r"\*";
     }
     
     int children(int delegate(ref IObject) dg) {
@@ -632,11 +640,11 @@ class Win32Directory : Win32Object
     }
     int references(int delegate(ref IObject) dg) { return 0; }
     
-    Variant opIndex(wstring property)
+    Variant opIndex(string property)
     {
         switch (property) {
             case "type":
-                return Variant("directory"w);
+                return Variant("directory");
             default:
                 return super[property];
         }
@@ -661,7 +669,7 @@ class Win32File : Win32Object
     this(wstring parent, WIN32_FILE_ATTRIBUTE_DATA* findData, wstring name)
     {
         super(findData, name);
-        _abspath = parent ~ r"\" ~ _name;
+        _abspath = parent ~ r"\" ~ name;
     }
     
     int children(int delegate(ref IObject) dg)
@@ -673,7 +681,7 @@ class Win32File : Win32Object
     {
         return children(dg);
     }
-    int properties(int delegate(ref wstring) dg)
+    int properties(int delegate(ref string) dg)
     {
         int ret;
         foreach (p; _properties) {
@@ -682,13 +690,13 @@ class Win32File : Win32Object
         return super.properties(dg);
     }
     
-    Variant opIndex(wstring property)
+    Variant opIndex(string property)
     {
         switch (property) {
             case "size":
                 return Variant((cast(long)_findData.nFileSizeHigh << 32) | cast(long)_findData.nFileSizeLow);
             case "type":
-                return Variant("file"w);
+                return Variant("file");
             default:
                 return super[property];
         }
@@ -707,5 +715,5 @@ class Win32File : Win32Object
     }
 
 private:
-    static wstring[] _properties = ["size"];
+    static string[] _properties = ["size"];
 }
