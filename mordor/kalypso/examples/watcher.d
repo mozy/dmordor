@@ -58,7 +58,13 @@ void tmain(tstring[] args)
     args = args[1..$];
     foreach(arg; args) {
         tstring path = arg;
-        watcher.watch(path, IWatcher.Events.All);
+        IObject object;
+        try {
+            object = vfs.find(path);
+            watcher.watch(object, IWatcher.Events.All);
+        } catch (PlatformException ex) {
+            Stderr.formatln("{} - {}", arg, ex);
+        }
     }
 
     ioManager.start(true);

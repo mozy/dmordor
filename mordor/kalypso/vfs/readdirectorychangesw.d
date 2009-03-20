@@ -8,6 +8,7 @@ import win32.winnt;
 import mordor.common.exception;
 import mordor.common.iomanager;
 import mordor.common.stringutils;
+import mordor.kalypso.vfs.helpers;
 import mordor.kalypso.vfs.model;
 
 class ReadDirectoryChangesWWatcher : IWatcher
@@ -28,10 +29,10 @@ class ReadDirectoryChangesWWatcher : IWatcher
     Events supportedEvents() {
         return Events.AccessTime | Events.Attributes | Events.Create |
             Events.CreationTime | Events.Delete | Events.Metadata |
-            Events.ModificationTime | Events.Move | Events.MovedFrom |
-            Events.MovedTo | Events.Security | Events.Size |
-            Events.EventsDropped | Events.Files | Events.Directories |
-            Events.OneShot | Events.Recursive;
+            Events.ModificationTime | Events.MovedFrom | Events.MovedTo |
+            Events.Security | Events.Size | Events.EventsDropped |
+            Events.Files | Events.Directories | Events.OneShot |
+            Events.Recursive;
     }
     
     private class Worker
@@ -48,7 +49,7 @@ class ReadDirectoryChangesWWatcher : IWatcher
             DWORD filter;
             if ((events & (Events.Files | Events.Directories)) == 0)
                 events |= Events.Files | Events.Directories;
-            if (events & (Events.Create | Events.Move | Events.MovedFrom | Events.MovedTo | Events.Delete)) {
+            if (events & (Events.Create | Events.MovedFrom | Events.MovedTo | Events.Delete)) {
                 if (events & Events.Files)
                     filter |= FILE_NOTIFY_CHANGE_FILE_NAME;
                 if (events & Events.Directories)
@@ -103,10 +104,10 @@ class ReadDirectoryChangesWWatcher : IWatcher
                             events = Events.Metadata;
                             break;
                         case FILE_ACTION_RENAMED_OLD_NAME:
-                            events = Events.MovedFrom | Events.Move;
+                            events = Events.MovedFrom;
                             break;
                         case FILE_ACTION_RENAMED_NEW_NAME:
-                            events = Events.MovedTo | Events.Move;
+                            events = Events.MovedTo;
                             break;
                     }
                     // TODO: normalize path (it may not be in the correct case)
@@ -122,16 +123,16 @@ class ReadDirectoryChangesWWatcher : IWatcher
         }
     }
 
-    void watch(wstring path, Events events)
+    void watch(IObject object, Events events)
     in
     {
-        assert(path.length > 0);
+        assert(object["type"].isA!(wstring));
+        assert(object["type"].get!(wstring) == "directory" ||
+               object["type"].get!(wstring) == "volume");
     }
     body
     {
-        if (path[$-1] != '\\')
-            path ~= r"\";
-        
+        wstring path = object["absolute_path"].get!(wstring);
         HANDLE hDir = CreateFileW(toString16z(path),
                                   FILE_LIST_DIRECTORY,
                                   FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
@@ -144,7 +145,7 @@ class ReadDirectoryChangesWWatcher : IWatcher
         _ioManager.registerFile(hDir);
         auto worker = new Worker();
         worker.hDir = hDir;
-        worker.path = path;
+        worker.path = getFullPath(object) ~ "/";
         worker.events = events;
         _ioManager.schedule(new Fiber(&worker.run));
     }

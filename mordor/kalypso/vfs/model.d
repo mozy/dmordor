@@ -24,6 +24,7 @@ interface IVersionedVFS : IVFS
 
 interface IObject
 {
+    IObject parent();
     int children(int delegate(ref IObject) dg);
     int references(int delegate(ref IObject) dg);
     int properties(int delegate(ref tstring) dg);
@@ -53,12 +54,11 @@ interface IWatcher
         Delete              = 0x0200,
         Metadata            = 0x0004,
         ModificationTime    = 0x0002,
-        Move                = 0x4000,
         MovedFrom           = 0x0040,
         MovedTo             = 0x0080,
         Open                = 0x0020,
         Security            = 0x0400,
-        Size                = 0x8000,
+        Size                = 0x4000,
 
         // Events have been dropped
         EventsDropped = 0x02000000,
@@ -81,7 +81,7 @@ interface IWatcher
 
     Events supportedEvents();
 
-    void watch(tstring path, Events events);
+    void watch(IObject object, Events events);
 }
 
 interface IWatchableVFS : IVFS

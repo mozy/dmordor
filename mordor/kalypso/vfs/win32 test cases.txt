@@ -1,0 +1,19 @@
+Setup
+
+C: - hard disk
+C:\dir1 - directory
+C:\dir1\dir2 - directory
+H: - Mounted network drive
+Z: - Subst for C:\dir1
+
+
+C: => Drive C:
+  Refs Volume
+H: => Drive H:
+  Refs UNC Share
+Z: => Drive Z:
+  Refs C:\dir1
+C:\ => Volume
+H:\ => UNC Share
+Z:\ => Directory (Volume\dir1)
+Z:\dir1 => Directory (Volume\dir1\dir2)

@@ -41,6 +41,26 @@ version (linux) {
     private alias IVFS IVFSOnThisPlatform;
 }
 
+private IObject find(string path)
+{
+    if (path.length == 0 || path[0] != '/')
+        path = '/' ~ path;
+    if (path == "/")
+        return new PosixVFS();
+    // TODO: canonicalize
+    stat_t buf;
+    if (lstat(toStringz(path), &buf) != 0) {
+        throw exceptionFromLastError();
+    }
+    if (S_ISDIR(buf.st_mode)) {
+        return new PosixDirectory(path, &buf);
+    } else if (S_ISREG(buf.st_mode)){
+        return new PosixFile(path, &buf);
+    } else {
+        return null;
+    }
+}
+
 class PosixVFS : PosixDirectory, IVFSOnThisPlatform
 {
     this()
@@ -51,6 +71,8 @@ class PosixVFS : PosixDirectory, IVFSOnThisPlatform
         }
         super("/", &buf);
     }
+    
+    IObject parent() { return null; }
 
     Variant opIndex(string property)
     {
@@ -73,22 +95,7 @@ class PosixVFS : PosixDirectory, IVFSOnThisPlatform
     
     IObject find(string path)
     {
-        if (path.length == 0 || path[0] != '/')
-            path = '/' ~ path;
-        if (path == "/")
-            return new PosixVFS();
-        // TODO: canonicalize
-        stat_t buf;
-        if (lstat(toStringz(path), &buf) != 0) {
-            throw exceptionFromLastError();
-        }
-        if (S_ISDIR(buf.st_mode)) {
-            return new PosixDirectory(path, &buf);
-        } else if (S_ISREG(buf.st_mode)){
-            return new PosixFile(path, &buf);
-        } else {
-            return null;
-        }
+        return .find(path);
     }
     
     version (linux) {
@@ -116,6 +123,11 @@ class PosixObject : IObject
         _name = _abspath[locatePrior(_abspath, '/') + 1..$];
     }
     
+    IObject parent()
+    {
+        return .find(abspath[0..locatePrior(abspath, '/')]);        
+    }
+    
     abstract int children(int delegate(ref IObject) dg);
     abstract int references(int delegate(ref IObject) dg);
 
@@ -139,7 +151,7 @@ class PosixObject : IObject
             case "name":
                 return Variant(_name);
             case "absolute_path":
-                return Variant(_abspath);
+                return Variant(abspath);
             case "hidden":
                 return Variant(_name.length > 0 && _name[0] == '.');
             case "access_time":
@@ -174,6 +186,8 @@ protected:
             _isDirent = false;
         }
     }
+    
+    string abspath() { return _abspath; }
 
 private:
     static string[] _properties = ["name",
@@ -259,6 +273,9 @@ class PosixDirectory : PosixObject
     
     Stream open()
     { return null; }
+    
+protected:
+    string abspath() { return _abspath[0..$-1]; }
 }
 
 class PosixFile : PosixObject

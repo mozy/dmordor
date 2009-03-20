@@ -12,6 +12,7 @@ import mordor.common.streams.buffered;
 import mordor.common.streams.fd;
 import mordor.common.stringutils;
 import mordor.kalypso.vfs.model;
+import mordor.kalypso.vfs.helpers;
 
 private Logger _log;
 
@@ -23,7 +24,7 @@ static this()
 class InotifyWatcher : IWatcher
 {
 public:
-    this(IOManager ioManager, void delegate(string, Events) dg)
+    this(IOManager ioManager, void delegate(tstring, Events) dg)
     {
         _dg = dg;
         _fd = inotify_init();
@@ -40,20 +41,14 @@ public:
         return Events.AccessTime | Events.ModificationTime |
             Events.Metadata | Events.CloseWrite | Events.CloseNoWrite |
             Events.Close | Events.Open | Events.MovedFrom | Events.MovedTo |
-            Events.Move | Events.Create | Events.Delete |
-            Events.EventsDropped | Events.FileDirect | Events.IncludeSelf |
-            Events.Files | Events.Directories | Events.OneShot;
+            Events.Create | Events.Delete | Events.EventsDropped |
+            Events.FileDirect | Events.IncludeSelf | Events.Files |
+            Events.Directories | Events.OneShot;
     }
 
-    void watch(string path, Events events)
-    in
+    void watch(IObject object, Events events)
     {
-        assert(path.length > 0);
-    }
-    body
-    {
-        if (path[$-1] == '/')
-            path = path[0..$-1];
+        string path = object["absolute_path"].get!(string);
         Events requested = events;
         uint inotifyEvents;
         mapEvents(inotifyEvents, events);
@@ -63,7 +58,7 @@ public:
         int wd = inotify_add_watch(_fd, toStringz(path), inotifyEvents);
         if (wd < 0)
             throw exceptionFromLastError();
-        _wdToDetails[wd] = WatchDetails(path, events);
+        _wdToDetails[wd] = WatchDetails(getFullPath(object), events);
         _pathToWd[path] = wd;
     }
     
@@ -138,8 +133,6 @@ private:
         events = cast(Events)((cast(uint)events & 0xffff0000) | inotifyEvents);
         if (events & Events.Close)
             inotifyEvents |= IN_CLOSE_WRITE | IN_CLOSE_NOWRITE;
-        if (events & Events.Move)
-            inotifyEvents |= IN_MOVED_FROM | IN_MOVED_TO;      
     }
     void mapFlags(ref uint inotifyEvents, ref Events events)
     {
@@ -151,7 +144,7 @@ private:
             events |= Events.Files;
         } else
             inotifyEvents |= IN_ONLYDIR;
-        if ((events & Events.IncludeSelf) && (events & (Events.MovedFrom | Events.Move)))
+        if ((events & Events.IncludeSelf) && (events & Events.MovedFrom))
             inotifyEvents |= IN_MOVE_SELF;
         if ((events & Events.IncludeSelf) && (events & Events.Delete))
             inotifyEvents |= IN_DELETE_SELF;  
@@ -160,8 +153,8 @@ private:
         Events events = cast(Events)(inotifyEvents & 0x3ff);
         if (inotifyEvents & IN_DELETE_SELF)
             events |= Events.Delete;
-        if (inotifyEvents & (IN_MOVE_SELF | IN_MOVED_FROM | IN_MOVED_TO))
-            events |= Events.Move;
+        if (inotifyEvents & IN_MOVE_SELF)
+            events |= Events.MovedFrom;
         if (inotifyEvents & (IN_CLOSE_NOWRITE | IN_CLOSE_WRITE))
             events |= Events.Close;
         if (inotifyEvents & IN_ISDIR)
