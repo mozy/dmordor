@@ -33,7 +33,7 @@ public:
         _inotifyStream = new BufferedStream(new FDStream(ioManager, _fd));
         ioManager.schedule(new Fiber(&this.run));
     }
-    
+
     // no ~this; FDStream owns the fd
     
     Events supportedEvents()
@@ -44,6 +44,11 @@ public:
             Events.Create | Events.Delete | Events.EventsDropped |
             Events.FileDirect | Events.IncludeSelf | Events.Files |
             Events.Directories | Events.OneShot;
+    }
+    
+    bool isReliable(IObject object)
+    {
+        return true;
     }
 
     void watch(IObject object, Events events)

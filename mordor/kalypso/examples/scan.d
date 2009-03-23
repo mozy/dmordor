@@ -10,6 +10,7 @@ import mordor.common.config;
 import mordor.common.exception;
 import mordor.common.log;
 import mordor.common.stringutils;
+import mordor.kalypso.vfs.helpers;
 import mordor.kalypso.vfs.manager;
 
 void main()
@@ -17,43 +18,47 @@ void main()
     Config.loadFromEnvironment();
     Log.root.add(new AppendConsole());
     enableLoggers();
-    long files, dirs;
+    long[string] counts;
     
     void recurse(IObject object, int level) {
         for(int i = 0; i < level * 4; ++i)
             Stdout.format(" ");
         Stdout.formatln("{}", object["name"].get!(string));
-        foreach(p; &object.properties) {
+        foreach(p, c, s; &object.properties) {
             if (p == "name")
                 continue;
             for(int i = 0; i < (level + 1) * 4; ++i)
                 Stdout.format(" ");
             Variant v = object[p];
+            string cs;
+            if (c)
+                cs ~= "c";
+            if (s)
+                cs ~= "s";
             if (v.isA!(string))
-                Stdout.formatln("@{} = {}", p, v.get!(string));
+                Stdout.formatln("{}@{} = {}", cs, p, v.get!(string));
             else if (v.isA!(bool))
-                Stdout.formatln("@{} = {}", p, v.get!(bool));
+                Stdout.formatln("{}@{} = {}", cs, p, v.get!(bool));
             else if (v.isA!(long))
-                Stdout.formatln("@{} = {}", p, v.get!(long));
+                Stdout.formatln("{}@{} = {}", cs, p, v.get!(long));
             else if (v.isA!(Time))
-                Stdout.formatln("@{} = {}", p, toString(v.get!(Time)));
+                Stdout.formatln("{}@{} = {}", cs, p, toString(v.get!(Time)));
             else
-                Stdout.formatln("@{} ({})", p, v);
+                Stdout.formatln("{}@{} ({})", cs, p, v);
         }
         foreach(r; &object.references) {
             for(int i = 0; i < (level + 1) * 4; ++i)
                 Stdout.format(" ");
-            Stdout.formatln("#{}", r["absolute_path"].get!(tstring));
+            Stdout.formatln("#{}", getFullPath(r));
         }
-        Variant type = object["type"];
-        if (type.isA!(string) && type.get!(string) == "directory") {
-            if (++dirs % 1000 == 0) {
-                Stdout.formatln("{} dirs", dirs);
-            }
-        } else if (type.isA!(string) && type.get!(string) == "file"){
-            if (++files % 1000 == 0) {
-                Stdout.formatln("{} files", files);
-            }
+        string type = object["type"].get!(string);
+        long* count = type in counts;
+        if (count is null) {
+            counts[type] = 0;
+            count = type in counts;
+        }
+        if (++*count % 1000 == 0) {
+            Stdout.formatln("{} {}(s)", *count, type);
         }
         if (level >= 2)
             return;
@@ -69,5 +74,7 @@ void main()
     foreach(vfs; VFSManager.get) {
         recurse(vfs, 0);        
     }
-    Stdout.formatln("{} dirs {} files", dirs, files);
+    foreach(t, c; counts) {
+        Stdout.formatln("{} {}(s)", c, t);
+    }
 }

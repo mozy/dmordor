@@ -42,11 +42,17 @@ private IObject createObject(wstring parent, WIN32_FILE_ATTRIBUTE_DATA* findData
     return null;    
 }
 
-private Time convert (FILETIME time)
+private Time convert (long time)
 {
-    auto t = *cast(long*) &time;
-    t *= 100 / TimeSpan.NanosecondsPerTick;
-    return Time.epoch1601 + TimeSpan(t);
+    time *= 100 / TimeSpan.NanosecondsPerTick;
+    return Time.epoch1601 + TimeSpan(time);
+}
+
+private FILETIME convertToFileTime(Time t)
+{
+    long time = (t - Time.epoch1601).ticks;
+    time /= 100 / TimeSpan.NanosecondsPerTick;
+    return *cast(FILETIME*)&time;
 }
 
 private wstring resolveDrive(wstring drive)
@@ -190,8 +196,19 @@ private IObject find(wstring path)
     return createObject(path[0..lastSlash], &findData, path[lastSlash+1..$]);
 }
 
+private struct PropertyDetails
+{
+    bool creatable;
+    bool settable;
+}
+
 class Win32VFS : IVFS, IWatchableVFS
 {
+    static this() {
+        _properties["name"] = PropertyDetails(false, false);
+        _properties["type"] = PropertyDetails(false, false);
+    }
+
     IObject parent() { return null; }
 
     int children(int delegate(ref IObject) dg) {
@@ -237,10 +254,10 @@ class Win32VFS : IVFS, IWatchableVFS
         return 0;
     }
     int references(int delegate(ref IObject) dg) { return 0; }
-    int properties(int delegate(ref string) dg) {
+    int properties(int delegate(ref string, ref bool, ref bool) dg) {
         int ret;
-        foreach(p; _properties) {
-            if ( (ret = dg(p)) != 0) return ret;
+        foreach(p, d; _properties) {
+            if ( (ret = dg(p, d.creatable, d.settable)) != 0) return ret;
         }
         return 0;
     }
@@ -256,9 +273,16 @@ class Win32VFS : IVFS, IWatchableVFS
                 return Variant.init;
         }
     }
+    Variant[] opIndex(string[] properties)
+    {
+        return getProperties(this, properties);
+    }
     
     void opIndexAssign(Variant value, string property)
-    { assert(false); }
+    {}
+    
+    void opIndexAssign(Variant[string] properties)
+    {}
     
     void _delete()
     { assert(false); }
@@ -276,19 +300,23 @@ class Win32VFS : IVFS, IWatchableVFS
     }
 
 private:
-    static string[] _properties = ["name",
-                                   "type"];
+    static PropertyDetails[string] _properties;
 }
 
 class Win32Volume : IObject
 {
+    static this() {
+        _properties["name"] = PropertyDetails(false, false);
+        _properties["absolute_path"] = PropertyDetails(false, false);
+        _properties["type"] = PropertyDetails(false, false);
+    }
+
     this(wstring volume)
     in
     {
         assert(volume.length == 49);
         assert(volume[0..4] == r"\\?\");
-        assert(volume[48] == '\\');
-                
+        assert(volume[48] == '\\');                
     }
     body
     {
@@ -317,10 +345,10 @@ class Win32Volume : IObject
         return 0;
     }
     int references(int delegate(ref IObject) dg) { return 0; }
-    int properties(int delegate(ref string) dg) {
+    int properties(int delegate(ref string, ref bool, ref bool) dg) {
         int ret;
-        foreach(p; _properties) {
-            if ( (ret = dg(p)) != 0) return ret;
+        foreach(p, d; _properties) {
+            if ( (ret = dg(p, d.creatable, d.settable)) != 0) return ret;
         }
         return 0;
     }
@@ -338,9 +366,16 @@ class Win32Volume : IObject
                 return Variant.init;            
         }
     }
+    Variant[] opIndex(string[] properties)
+    {
+        return getProperties(this, properties);
+    }
     
     void opIndexAssign(Variant value, string property)
-    { assert(false); }
+    {}
+    
+    void opIndexAssign(Variant[string] properties)
+    {}
     
     void _delete()
     { assert(false); }
@@ -349,14 +384,21 @@ class Win32Volume : IObject
     { return null; }
 
 private:
-    static string[] _properties = ["name",
-                                    "absolute_path",
-                                    "type"];
+    static PropertyDetails[string] _properties;
+
+private:
     wstring _volume;
 }
 
 class Win32Drive : IObject
 {
+    static this() {
+        _properties["name"] = PropertyDetails(false, true);
+        _properties["absolute_path"] = PropertyDetails(false, false);
+        _properties["type"] = PropertyDetails(false, false);
+        _properties["target"] = PropertyDetails(false, true);
+    }
+
     this(wstring drive)
     in
     {
@@ -380,17 +422,16 @@ class Win32Drive : IObject
         return dg(targetObject);
     }
 
-    int properties(int delegate(ref string) dg)
+    int properties(int delegate(ref string, ref bool, ref bool) dg)
     {
         int ret;
-        foreach(p; _properties) {
-            if ( (ret = dg(p)) != 0) return ret;
+        foreach(p, d; _properties) {
+            if ( (ret = dg(p, d.creatable, d.settable)) != 0) return ret;
         }
         return 0;
     }
     
     Variant opIndex(string property)
-    body
     {
         switch (property) {
             case "name":
@@ -408,9 +449,29 @@ class Win32Drive : IObject
         }
     }
     
+    Variant[] opIndex(string[] properties)
+    {
+        return getProperties(this, properties);
+    }
+    
     void opIndexAssign(Variant value, string property)
     {
-        assert(false);
+        switch (property) {
+            case "name":
+                // TODO: change this drive letter; will need to delete and re-create
+                break;
+            case "target":
+                // TODO: change where a drive letter points to; will need to delete and re-create
+                break;
+            default:
+                break;
+        }
+    }
+    
+    void opIndexAssign(Variant[string] properties)
+    {
+        foreach(p, v; properties)
+            this[p] = v;
     }
     
     void _delete()
@@ -420,16 +481,19 @@ class Win32Drive : IObject
     { return null; }
     
 private:
-    static string[] _properties = ["name",
-                                   "absolute_path",
-                                   "type",
-                                   "target"];
+    static PropertyDetails[string] _properties;
     wstring _drive;
     wstring _target;
 }
 
 class Win32UNCShare : IObject
 {
+    static this() {
+        _properties["name"] = PropertyDetails(false, false);
+        _properties["absolute_path"] = PropertyDetails(false, false);
+        _properties["type"] = PropertyDetails(false, false);
+    }
+
     this(wstring serverAndShare)
     in
     {
@@ -463,10 +527,10 @@ class Win32UNCShare : IObject
         return 0;
     }
     int references(int delegate(ref IObject) dg) { return 0; }
-    int properties(int delegate(ref string) dg) {
+    int properties(int delegate(ref string, ref bool, ref bool) dg) {
         int ret;
-        foreach(p; _properties) {
-            if ( (ret = dg(p)) != 0) return ret;
+        foreach(p, d; _properties) {
+            if ( (ret = dg(p, d.creatable, d.settable)) != 0) return ret;
         }
         return 0;
     }
@@ -484,9 +548,15 @@ class Win32UNCShare : IObject
                 return Variant.init;            
         }
     }
+    Variant[] opIndex(string[] properties)
+    {
+        return getProperties(this, properties);
+    }
     
     void opIndexAssign(Variant value, string property)
-    { assert(false); }
+    {}
+    void opIndexAssign(Variant[string] properties)
+    {}
     
     void _delete()
     { assert(false); }
@@ -495,14 +565,29 @@ class Win32UNCShare : IObject
     { return null; }
 
 private:
-    static string[] _properties = ["name",
-                                   "absolute_path",
-                                   "type"];
+    static PropertyDetails[string] _properties;
     wstring _serverAndShare;    
 }
 
 class Win32Object : IObject
 {
+    static this() {
+        _properties["name"] = PropertyDetails(false, true);
+        _properties["absolute_path"] = PropertyDetails(false, false);
+        _properties["type"] = PropertyDetails(false, false);
+        _attributes["archive"] = FILE_ATTRIBUTE_ARCHIVE;
+        _attributes["compressed"] = FILE_ATTRIBUTE_COMPRESSED;
+        _attributes["encrypted"] = FILE_ATTRIBUTE_ENCRYPTED;
+        _attributes["hidden"] = FILE_ATTRIBUTE_HIDDEN;
+        _attributes["not_content_indexed"] = FILE_ATTRIBUTE_NOT_CONTENT_INDEXED;
+        _attributes["read_only"] = FILE_ATTRIBUTE_READONLY;
+        _attributes["system"] = FILE_ATTRIBUTE_SYSTEM;
+        _attributes["temporary"] = FILE_ATTRIBUTE_TEMPORARY;
+        _timestamps["access_time"] = WIN32_FILE_ATTRIBUTE_DATA.ftLastAccessTime.offsetof;
+        _timestamps["creation_time"] = WIN32_FILE_ATTRIBUTE_DATA.ftCreationTime.offsetof;
+        _timestamps["modification_time"] = WIN32_FILE_ATTRIBUTE_DATA.ftLastWriteTime.offsetof;
+    }
+
     this(WIN32_FILE_ATTRIBUTE_DATA* findData, wstring name)
     {
         _findData = *findData;
@@ -516,33 +601,19 @@ class Win32Object : IObject
     abstract int children(int delegate(ref IObject) dg);
     abstract int references(int delegate(ref IObject) dg);
 
-    int properties(int delegate(ref string) dg) {
+    int properties(int delegate(ref string, ref bool, ref bool) dg) {
         int ret;
-        foreach(p; _properties) {
-            if ( (ret = dg(p)) != 0) return ret;
+        foreach(p, d; _properties) {
+            if ( (ret = dg(p, d.creatable, d.settable)) != 0) return ret;
         }
-        if (_findData.dwFileAttributes & FILE_ATTRIBUTE_ARCHIVE)
-            if ( (ret = dg(_dynamicProperties[0])) != 0) return ret;
-        if (_findData.dwFileAttributes & FILE_ATTRIBUTE_COMPRESSED)
-            if ( (ret = dg(_dynamicProperties[1])) != 0) return ret;
-        if (_findData.dwFileAttributes & FILE_ATTRIBUTE_ENCRYPTED)
-            if ( (ret = dg(_dynamicProperties[2])) != 0) return ret;
-        if (_findData.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN)
-            if ( (ret = dg(_dynamicProperties[3])) != 0) return ret;
-        if (_findData.dwFileAttributes & FILE_ATTRIBUTE_NOT_CONTENT_INDEXED)
-            if ( (ret = dg(_dynamicProperties[4])) != 0) return ret;
-        if (_findData.dwFileAttributes & FILE_ATTRIBUTE_READONLY)
-            if ( (ret = dg(_dynamicProperties[5])) != 0) return ret;
-        if (_findData.dwFileAttributes & FILE_ATTRIBUTE_SYSTEM)
-            if ( (ret = dg(_dynamicProperties[6])) != 0) return ret;
-        if (_findData.dwFileAttributes & FILE_ATTRIBUTE_TEMPORARY)
-            if ( (ret = dg(_dynamicProperties[7])) != 0) return ret;
-        if ((cast(LARGE_INTEGER)_findData.ftLastAccessTime).QuadPart != 0)
-            if ( (ret = dg(_dynamicProperties[8])) != 0) return ret;
-        if ((cast(LARGE_INTEGER)_findData.ftCreationTime).QuadPart != 0)
-            if ( (ret = dg(_dynamicProperties[9])) != 0) return ret;
-        if ((cast(LARGE_INTEGER)_findData.ftLastWriteTime).QuadPart != 0)
-            if ( (ret = dg(_dynamicProperties[10])) != 0) return ret;
+        bool _true = true;
+        foreach(a, v; _attributes) {
+            if ( (ret = dg(a, _true, _true)) != 0) return ret;
+        }
+        foreach(t, o; _timestamps) {
+            if (timestamp(o) != 0)
+                if ( (ret = dg(t, _true, _true)) != 0) return ret;
+        }
         return 0;
     }
     
@@ -553,58 +624,155 @@ class Win32Object : IObject
                 return Variant(_name);
             case "absolute_path":
                 return Variant(abspath);
-            case "archive":
-                return _findData.dwFileAttributes & FILE_ATTRIBUTE_ARCHIVE ? Variant(true) : Variant.init;
-            case "compressed":
-                return _findData.dwFileAttributes & FILE_ATTRIBUTE_COMPRESSED ? Variant(true) : Variant.init;
-            case "encrypted":
-                return _findData.dwFileAttributes & FILE_ATTRIBUTE_ENCRYPTED ? Variant(true) : Variant.init;
-            case "hidden":
-                return _findData.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN ? Variant(true) : Variant.init;
-            case "not_content_indexed":
-                return _findData.dwFileAttributes & FILE_ATTRIBUTE_NOT_CONTENT_INDEXED ? Variant(true) : Variant.init;
-            case "read_only":
-                return _findData.dwFileAttributes & FILE_ATTRIBUTE_READONLY ? Variant(true) : Variant.init;
-            case "system":
-                return _findData.dwFileAttributes & FILE_ATTRIBUTE_SYSTEM ? Variant(true) : Variant.init;
-            case "temporary":
-                return _findData.dwFileAttributes & FILE_ATTRIBUTE_TEMPORARY ? Variant(true) : Variant.init;
-            case "access_time":
-                return (cast(LARGE_INTEGER)_findData.ftLastAccessTime).QuadPart != 0 ? Variant(convert(_findData.ftLastAccessTime)) : Variant.init;
-            case "creation_time":
-                return (cast(LARGE_INTEGER)_findData.ftCreationTime).QuadPart != 0 ? Variant(convert(_findData.ftCreationTime)) : Variant.init;
-            case "modification_time":
-                return (cast(LARGE_INTEGER)_findData.ftLastWriteTime).QuadPart != 0 ? Variant(convert(_findData.ftLastWriteTime)) : Variant.init;
             default:
+                foreach (a, v; _attributes)
+                {
+                    if (property == a)
+                        return Variant(!!(_findData.dwFileAttributes & v));
+                }
+                foreach (t, o; _timestamps)
+                {
+                    if (property == t)
+                        return Variant(convert(timestamp(o)));
+                }
                 return Variant.init;
         }
     }
+    Variant[] opIndex(string[] properties)
+    {
+        return getProperties(this, properties);
+    }
     
+    private void handleProperty(string property,
+                                Variant value,
+                                ref DWORD newAttributes,
+                                ref FILETIME newAtime,
+                                ref FILETIME newMtime,
+                                ref FILETIME newCtime,
+                                ref FILETIME* pNewAtime,
+                                ref FILETIME* pNewMtime,
+                                ref FILETIME* pNewCtime)
+    {
+        foreach(a, av; _attributes) {
+            if (property == a) {
+                if (value.get!(bool)) {
+                    newAttributes |= av;
+                } else {
+                    newAttributes &= ~av;
+                }
+            }
+        }
+        switch (property) {
+            case "name":
+                if (value.get!(string) != _name) {
+                    // TODO: rename it (does this need to be done by the subclass?
+                    _name = value.get!(string);
+                    // TODO: update the absolute path
+                }
+                break;
+            case "compressed":
+                if (value.get!(bool) != !!(_findData.dwFileAttributes & FILE_ATTRIBUTE_COMPRESSED)) {
+                    // TODO: compress it
+                    _findData.dwFileAttributes |= FILE_ATTRIBUTE_COMPRESSED;
+                }
+                break;
+            case "encrypted":
+                if (value.get!(bool) != !!(_findData.dwFileAttributes & FILE_ATTRIBUTE_ENCRYPTED)) {
+                    // TODO: encrypt it
+                    _findData.dwFileAttributes |= FILE_ATTRIBUTE_ENCRYPTED;
+                }
+                break;
+            case "access_time":
+                newAtime = convertToFileTime(value.get!(Time));
+                pNewAtime = &newAtime;
+                break;
+            case "creation_time":
+                newCtime = convertToFileTime(value.get!(Time));
+                pNewCtime = &newCtime;
+                break;
+            case "modification_time":
+                newMtime = convertToFileTime(value.get!(Time));
+                pNewMtime = &newMtime;
+                break;
+            default:
+                break;
+        }
+    }
+    
+    private void commitProperties(DWORD newAttributes,
+                                  FILETIME newAtime,
+                                  FILETIME newMtime,
+                                  FILETIME newCtime,
+                                  FILETIME* pNewAtime,
+                                  FILETIME* pNewMtime,
+                                  FILETIME* pNewCtime)
+    {
+        if (newAttributes != _findData.dwFileAttributes) {
+            if (!SetFileAttributesW(toString16z(abspath), newAttributes))
+                throw exceptionFromLastError();
+            _findData.dwFileAttributes = newAttributes;
+        }
+        if (pNewAtime !is null || pNewCtime !is null || pNewMtime !is null) {
+            HANDLE hFile = CreateFileW(toString16z(abspath),
+                FILE_WRITE_ATTRIBUTES,
+                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                NULL,
+                OPEN_EXISTING,
+                0,
+                NULL);
+            if (hFile == INVALID_HANDLE_VALUE)
+                throw exceptionFromLastError();
+            scope (exit) CloseHandle(hFile);
+            if (!SetFileTime(hFile, pNewCtime, pNewAtime, pNewMtime))
+                throw exceptionFromLastError();
+        }
+    }
+
     void opIndexAssign(Variant value, string property)
-    { assert(false); }
+    {
+        DWORD newAttributes = _findData.dwFileAttributes;
+        FILETIME newAtime, newMtime, newCtime;
+        FILETIME* pNewAtime, pNewMtime, pNewCtime;
+        handleProperty(property, value, newAttributes, newAtime, newMtime, newCtime,
+            pNewAtime, pNewMtime, pNewCtime);
+        commitProperties(newAttributes, newAtime, newMtime, newCtime,
+            pNewAtime, pNewMtime, pNewCtime);
+    }
+
+    void opIndexAssign(Variant[string] properties)
+    {
+        DWORD newAttributes = _findData.dwFileAttributes;
+        FILETIME newAtime, newMtime, newCtime;
+        FILETIME* pNewAtime, pNewMtime, pNewCtime;
+        foreach(p, v; properties) {
+            handleProperty(p, v, newAttributes, newAtime, newMtime, newCtime,
+                pNewAtime, pNewMtime, pNewCtime);
+        }
+        commitProperties(newAttributes, newAtime, newMtime, newCtime,
+            pNewAtime, pNewMtime, pNewCtime);
+    }
     
     abstract void _delete();
     abstract Stream open();
     
 protected:
     wstring abspath() { return _abspath; }
+    
+private:
+    long timestamp(size_t offset)
+    {
+        return (cast(LARGE_INTEGER*)(cast(void*)&_findData + offset)).QuadPart;
+    }
+    void timestamp(size_t offset, long value)
+    {
+        (cast(LARGE_INTEGER*)(cast(void*)&_findData + offset)).QuadPart = value;
+    }
 
 private:
-    static string[] _properties = ["name",
-                                   "absolute_path",
-                                   "type"];
-    static string[] _dynamicProperties = 
-                                  ["archive",
-                                   "compressed",
-                                   "encrypted",
-                                   "hidden",
-                                   "not_content_indexed",
-                                   "read_only",
-                                   "system",
-                                   "temporary",
-                                   "access_time",
-                                   "creation_time",
-                                   "modification_time"];
+    static PropertyDetails[string] _properties;
+    static DWORD[string] _attributes;         
+    static size_t[string] _timestamps;
+
 protected:
     string _name;
     WIN32_FILE_ATTRIBUTE_DATA _findData;
@@ -666,6 +834,10 @@ protected:
 
 class Win32File : Win32Object
 {
+    static this() {
+        _properties["size"] = PropertyDetails(false, false);
+    }
+
     this(wstring parent, WIN32_FILE_ATTRIBUTE_DATA* findData, wstring name)
     {
         super(findData, name);
@@ -681,11 +853,11 @@ class Win32File : Win32Object
     {
         return children(dg);
     }
-    int properties(int delegate(ref string) dg)
+    int properties(int delegate(ref string, ref bool, ref bool) dg)
     {
         int ret;
-        foreach (p; _properties) {
-            if ( (ret = dg(p)) != 0) return ret;
+        foreach (p, d; _properties) {
+            if ( (ret = dg(p, d.creatable, d.settable)) != 0) return ret;
         }
         return super.properties(dg);
     }
@@ -715,5 +887,5 @@ class Win32File : Win32Object
     }
 
 private:
-    static string[] _properties = ["size"];
+    static PropertyDetails[string] _properties;
 }

@@ -1,5 +1,7 @@
 module mordor.kalypso.vfs.helpers;
 
+import tango.core.Variant;
+
 import mordor.common.stringutils;
 import mordor.kalypso.vfs.model;
 
@@ -24,4 +26,14 @@ string getFullPath(IObject object)
     }
     recurse(object);
     return ret;
+}
+
+Variant[] getProperties(IObject object, string[] properties)
+{
+    Variant[] values;
+    values.length = properties.length;
+    foreach(i, p; properties) {
+        values[i] = object[p];
+    }
+    return values;
 }

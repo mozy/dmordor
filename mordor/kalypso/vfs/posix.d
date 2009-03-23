@@ -14,6 +14,7 @@ version (linux) import mordor.common.iomanager;
 import mordor.common.streams.file;
 import mordor.common.streams.stream;
 import mordor.common.stringutils;
+import mordor.kalypso.vfs.helpers;
 version (linux) import mordor.kalypso.vfs.inotify;
 import mordor.kalypso.vfs.model;
 
@@ -61,6 +62,12 @@ private IObject find(string path)
     }
 }
 
+private struct PropertyDetails
+{
+    bool creatable;
+    bool settable;
+}
+
 class PosixVFS : PosixDirectory, IVFSOnThisPlatform
 {
     this()
@@ -73,6 +80,20 @@ class PosixVFS : PosixDirectory, IVFSOnThisPlatform
     }
     
     IObject parent() { return null; }
+    
+    int properties(int delegate(ref string, ref bool, ref bool) dg)
+    {
+        int ret;
+        bool _false = false;
+        foreach (p, c, s; &super.properties) {
+            if (p == "name") {
+                if ( (ret = (dg(p, _false, _false))) != 0) return ret;
+            } else {
+                if ( (ret = (dg(p, c, s))) != 0) return ret;
+            }
+        }
+        return ret;
+    }
 
     Variant opIndex(string property)
     {
@@ -83,10 +104,11 @@ class PosixVFS : PosixDirectory, IVFSOnThisPlatform
                 return super[property];
         }
     }
+
     void opIndexAssign(Variant value, string property)
     {
         if (property == "name")
-            assert(false);
+            return;
         super[property] = value;
     }
     
@@ -108,6 +130,17 @@ class PosixVFS : PosixDirectory, IVFSOnThisPlatform
 
 class PosixObject : IObject
 {
+    static this()
+    {
+        _properties["name"] = PropertyDetails(true, true);
+        _properties["absolute_path"] = PropertyDetails(false, false);
+        _properties["type"] = PropertyDetails(true, false);
+        _properties["access_time"] = PropertyDetails(true, true);
+        _properties["change_time"] = PropertyDetails(true, true);
+        _properties["modification_time"] = PropertyDetails(true, true);
+        version (freebsd) _properties["creation_time"] = PropertyDetails(true, true);
+    }
+
     this(dirent* ent)
     {
         _isDirent = true;
@@ -131,16 +164,14 @@ class PosixObject : IObject
     abstract int children(int delegate(ref IObject) dg);
     abstract int references(int delegate(ref IObject) dg);
 
-    int properties(int delegate(ref string) dg) {
+    int properties(int delegate(ref string, ref bool, ref bool) dg) {
         static string hidden = "hidden";
         int ret;
+        bool _false = false;
         if (_name.length > 0 && _name[0] == '.')
-            if ( (ret = dg(hidden)) != 0) return ret;        
-        foreach(p; _properties) {
-            if ( (ret = dg(p)) != 0) return ret;
-        }
-        foreach(p; _nativeProperties) {
-            if ( (ret = dg(p)) != 0) return ret;
+            if ( (ret = dg(hidden, _false, _false)) != 0) return ret;        
+        foreach(p, d; _properties) {
+            if ( (ret = dg(p, d.creatable, d.settable)) != 0) return ret;
         }
         return 0;
     }
@@ -158,18 +189,24 @@ class PosixObject : IObject
                 return Variant(convert(_stat.st_atime, _stat.st_atimensec));
             case "change_time":
                 return Variant(convert(_stat.st_ctime, _stat.st_ctimensec));
-version (freebsd) {
-            case "creation_time":
-                return Variant(convert(_stat.st_birthtimespec.tv_sec, _stat.st_birthtimespec.tv_nsec));
-}
+            version (freebsd) {
+                case "creation_time":
+                    return Variant(convert(_stat.st_birthtimespec.tv_sec, _stat.st_birthtimespec.tv_nsec));
+            }
             case "modification_time":
                 return Variant(convert(_stat.st_mtime, _stat.st_mtimensec));
             default:
                 return Variant.init;
         }
     }
+    Variant[] opIndex(string[] properties)
+    {
+        return getProperties(this, properties);
+    }
 
     void opIndexAssign(Variant value, string property)
+    { assert(false); }
+    void opIndexAssign(Variant[string] properties)
     { assert(false); }
     
     abstract void _delete();
@@ -190,17 +227,8 @@ protected:
     string abspath() { return _abspath; }
 
 private:
-    static string[] _properties = ["name",
-                                   "absolute_path",
-                                   "type",
-                                   "access_time",
-                                   "change_time",
-                                   "modification_time"];
-    version (freebsd) {
-        static string[] _nativeProperties = ["creation_time"];
-    } else {
-        static string[] _nativeProperties;
-    }
+    static PropertyDetails[string] _properties;
+
 protected:
     string _abspath;
     string _name;
@@ -212,7 +240,7 @@ protected:
 }
 
 class PosixDirectory : PosixObject
-{    
+{
     this(string parent, dirent* ent)
     {
         super(ent);
@@ -279,7 +307,12 @@ protected:
 }
 
 class PosixFile : PosixObject
-{    
+{
+    static this()
+    {
+        _properties["size"] = PropertyDetails(false, false);
+    }
+
     this(string parent, dirent* ent)
     {
         super(ent);
@@ -293,11 +326,11 @@ class PosixFile : PosixObject
 
     int children(int delegate(ref IObject) dg) { return 0; }
     int references(int delegate(ref IObject) dg) { return 0; }
-    int properties(int delegate(ref string) dg)
+    int properties(int delegate(ref string, ref bool, ref bool) dg)
     {
         int ret;
-        foreach (p; _properties) {
-            if ( (ret = dg(p)) != 0) return ret;
+        foreach (p, d; _properties) {
+            if ( (ret = dg(p, d.creatable, d.settable)) != 0) return ret;
         }
         return super.properties(dg);
     }
@@ -326,5 +359,5 @@ class PosixFile : PosixObject
     { return new FileStream(_abspath); }
     
 private:
-    static string[] _properties = ["size"];
+    static PropertyDetails[string] _properties;
 }

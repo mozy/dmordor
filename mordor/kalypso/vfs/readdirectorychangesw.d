@@ -123,6 +123,11 @@ class ReadDirectoryChangesWWatcher : IWatcher
             }
         }
     }
+    
+    bool isReliable(IObject object)
+    {
+        return object["absolute_path"].get!(wstring)[0..8] != r"\\?\UNC\";
+    }
 
     void watch(IObject object, Events events)
     in

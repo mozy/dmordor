@@ -27,9 +27,11 @@ interface IObject
     IObject parent();
     int children(int delegate(ref IObject) dg);
     int references(int delegate(ref IObject) dg);
-    int properties(int delegate(ref string) dg);
+    int properties(int delegate(ref string, ref bool, ref bool) dg);
     Variant opIndex(string property);
+    Variant[] opIndex(string[] properties);
     void opIndexAssign(Variant value, string property);
+    void opIndexAssign(Variant[string] properties);
     void _delete();
     Stream open();
 }
@@ -81,6 +83,7 @@ interface IWatcher
 
     Events supportedEvents();
 
+    bool isReliable(IObject object);
     void watch(IObject object, Events events);
 }
 
