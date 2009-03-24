@@ -235,7 +235,7 @@ in
     assert("name" in properties);
     assert("type" in properties);
     assert(properties["name"].isA!(string));
-//    assert(properties["type"].isA!(string));
+    assert(properties["type"].isA!(string));
 }
 body
 {

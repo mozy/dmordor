@@ -3,14 +3,17 @@ module mordor.kalypso.vfs.posix;
 import tango.core.Variant;
 import tango.stdc.errno;
 import tango.stdc.posix.dirent;
+import tango.stdc.posix.fcntl;
 import tango.stdc.posix.unistd;
 import tango.stdc.posix.sys.stat;
+import tango.stdc.posix.sys.time;
 import tango.stdc.stringz;
 import tango.text.Util;
 import tango.time.Time;
 
 import mordor.common.exception;
 version (linux) import mordor.common.iomanager;
+import mordor.common.streams.fd;
 import mordor.common.streams.file;
 import mordor.common.streams.stream;
 import mordor.common.stringutils;
@@ -28,12 +31,32 @@ private string nameFromDirent(dirent* ent)
     }
 }
 
-private Time convert (time_t time, uint nsec)
+D to(D, S)(S value)
 {
-    long t = time;
-    t *= TimeSpan.TicksPerSecond;
-    t += nsec / TimeSpan.NanosecondsPerTick;
-    return Time.epoch1970 + TimeSpan(t);
+    static if (is(D == Time) && is(S == timespec)) {
+        long t = value.tv_sec;
+        t *= TimeSpan.TicksPerSecond;
+        t += value.tv_nsec / TimeSpan.NanosecondsPerTick;
+        return Time.epoch1970 + TimeSpan(t);
+    } else static if (is(D == timeval) && is(S == Time)) {
+        timeval result;
+        long t = (value - Time.epoch1970).ticks;
+        result.tv_sec =  t / TimeSpan.TicksPerSecond;
+        result.tv_usec = (t / TimeSpan.TicksPerMicrosecond) % 1_000_000;
+        return result;
+    } else static if (is(D == timeval) && is(S == timespec)) {
+        timeval result;
+        result.tv_sec = value.tv_sec;
+        result.tv_usec = value.tv_nsec / 1000;
+        return result;
+    } else static if (is(D == timespec) && is(S == timeval)) {
+        timespec result;
+        result.tv_sec = value.tv_sec;
+        result.tv_nsec = value.tv_usec * 1000;
+        return result;
+    } else {
+        static assert(false);
+    }
 }
 
 version (linux) {
@@ -136,8 +159,11 @@ class PosixObject : IObject
         _properties["absolute_path"] = PropertyDetails(false, false);
         _properties["type"] = PropertyDetails(true, false);
         _properties["access_time"] = PropertyDetails(true, true);
-        _properties["change_time"] = PropertyDetails(true, true);
+        _properties["change_time"] = PropertyDetails(false, false);
         _properties["modification_time"] = PropertyDetails(true, true);
+        _properties["mode"] = PropertyDetails(true, true);
+        _properties["uid"] = PropertyDetails(true, true);
+        _properties["gid"] = PropertyDetails(true, true);
         version (freebsd) _properties["creation_time"] = PropertyDetails(true, true);
     }
 
@@ -154,6 +180,14 @@ class PosixObject : IObject
         _stat = *buf;
         _abspath = path;
         _name = _abspath[locatePrior(_abspath, '/') + 1..$];
+    }
+    
+    this(string path, stat_t* buf, string name)
+    {
+        _isDirent = false;
+        _stat = *buf;
+        _abspath = path;
+        _name = name;
     }
     
     IObject parent()
@@ -186,38 +220,156 @@ class PosixObject : IObject
             case "hidden":
                 return Variant(_name.length > 0 && _name[0] == '.');
             case "access_time":
-                return Variant(convert(_stat.st_atime, _stat.st_atimensec));
+                ensureStat();
+                return Variant(to!(Time)(*cast(timespec*)&_stat.st_atime));
             case "change_time":
-                return Variant(convert(_stat.st_ctime, _stat.st_ctimensec));
+                ensureStat();
+                return Variant(to!(Time)(*cast(timespec*)&_stat.st_ctime));
             version (freebsd) {
                 case "creation_time":
-                    return Variant(convert(_stat.st_birthtimespec.tv_sec, _stat.st_birthtimespec.tv_nsec));
+                    ensureStat();
+                    return Variant(to!(Time)(*cast(timespec*)&_stat.st_birthtimespec));
             }
             case "modification_time":
-                return Variant(convert(_stat.st_mtime, _stat.st_mtimensec));
+                ensureStat();
+                return Variant(to!(Time)(*cast(timespec*)&_stat.st_mtime));
+            case "mode":
+                ensureStat();
+                return Variant(cast(ushort)(_stat.st_mode & 07777));
+            case "uid":
+                ensureStat();
+                return Variant(_stat.st_uid);
+            case "gid":
+                ensureStat();
+                return Variant(_stat.st_gid);
             default:
                 return Variant.init;
         }
     }
-    Variant[] opIndex(string[] properties)
+    Variant[string] opSlice()
     {
-        return getProperties(this, properties);
+        return getProperties(this);
     }
 
     void opIndexAssign(Variant value, string property)
-    { assert(false); }
-    void opIndexAssign(Variant[string] properties)
-    { assert(false); }
+    {
+        switch (property) {
+            case "access_time":
+                ensureStat();
+                timeval[2] tvs;
+                tvs[0] = to!(timeval)(value.get!(Time));
+                tvs[1] = to!(timeval)(*cast(timespec*)&_stat.st_mtime);
+                if (utimes(toStringz(abspath), tvs) != 0)
+                    throw exceptionFromLastError();
+                *cast(timespec*)&_stat.st_atime = to!(timespec)(tvs[0]);
+                *cast(timespec*)&_stat.st_mtime = to!(timespec)(tvs[1]);
+                break;
+            case "modification_time":
+                ensureStat();
+                timeval[2] tvs;
+                tvs[0] = to!(timeval)(*cast(timespec*)&_stat.st_atime);
+                tvs[1] = to!(timeval)(value.get!(Time));
+                if (utimes(toStringz(abspath), tvs) != 0)
+                    throw exceptionFromLastError();
+                *cast(timespec*)&_stat.st_atime = to!(timespec)(tvs[0]);
+                *cast(timespec*)&_stat.st_mtime = to!(timespec)(tvs[1]);
+                break;
+            case "mode":
+                if (chmod(toStringz(abspath), value.get!(ushort)) != 0)
+                    throw exceptionFromLastError();
+                if (!_isDirent) {
+                    _stat.st_mode &= ~07777;
+                    _stat.st_mode |= value.get!(ushort);
+                }
+                break;
+            case "uid":
+                if (chown(toStringz(abspath), value.get!(uint), -1) != 0)
+                    throw exceptionFromLastError();
+                if (!_isDirent) {
+                    _stat.st_uid = value.get!(uint);
+                }
+            case "gid":
+                if (chown(toStringz(abspath), -1, value.get!(uint)) != 0)
+                    throw exceptionFromLastError();
+                if (!_isDirent) {
+                    _stat.st_gid = value.get!(uint);
+                }
+            default:
+                break;
+        }
+    }
+
+    void opSliceAssign(Variant[string] properties)
+    {
+        timeval[2] tvs;
+        bool hasTimestamp;
+        uint uid = -1, gid = -1;
+        foreach(p, v; properties) {
+            switch (p) {
+                case "access_time":
+                    if (!hasTimestamp) {
+                        ensureStat();
+                        tvs[1] = to!(timeval)(*cast(timespec*)&_stat.st_mtime);
+                    }
+                    tvs[0] = to!(timeval)(v.get!(Time));
+                    hasTimestamp = true;
+                    break;
+                case "modification_time":
+                    if (!hasTimestamp) {
+                        ensureStat();
+                        tvs[0] = to!(timeval)(*cast(timespec*)&_stat.st_atime);
+                    }
+                    tvs[1] = to!(timeval)(v.get!(Time));
+                    hasTimestamp = true;
+                    break;
+                case "mode":
+                    if (chmod(toStringz(abspath), v.get!(ushort)) != 0)
+                        throw exceptionFromLastError();
+                    if (!_isDirent) {
+                        _stat.st_mode &= ~07777;
+                        _stat.st_mode |= v.get!(ushort);
+                    }
+                case "uid":
+                    uid = v.get!(uint);
+                    break;
+                case "gid":
+                    gid = v.get!(uint);
+                    break;
+                default:
+                    break;
+            }
+        }
+        
+        if (hasTimestamp) {
+            if (utimes(toStringz(abspath), tvs) != 0)
+                throw exceptionFromLastError();
+            *cast(timespec*)&_stat.st_atime = to!(timespec)(tvs[0]);
+            *cast(timespec*)&_stat.st_mtime = to!(timespec)(tvs[1]);
+        }
+        if (uid != -1 || gid != -1) {
+            if (chown(toStringz(abspath), uid, gid) != 0)
+                throw exceptionFromLastError();
+            if (!_isDirent) {
+                _stat.st_uid = uid;
+                _stat.st_gid = gid;
+            }
+        }
+    }
     
     abstract void _delete();
     abstract Stream open();
+    abstract IObject create(Variant[string] properties, bool okIfExists, Stream* stream);
 
 protected:
     void ensureStat()
     {
         if (_isDirent) {
+            // Make sure we're not pointing into storage we're about to corrupt
+            if (_name.ptr == _dirent.d_name.ptr) {
+                _name = _name.dup;                
+            }
             stat_t buf;
-            if (lstat(toStringz(_abspath), &buf) != 0)
+            if (lstat(toStringz(abspath), &buf) != 0)
                 throw exceptionFromLastError();
             _stat = buf;
             _isDirent = false;
@@ -239,7 +391,7 @@ protected:
     }
 }
 
-class PosixDirectory : PosixObject
+class PosixDirectory : PosixObject, IOrderedEnumerateObject
 {
     this(string parent, dirent* ent)
     {
@@ -252,6 +404,12 @@ class PosixDirectory : PosixObject
         super(path, buf);
         if (_abspath[$-1] != '/')
             _abspath ~= '/';
+    }
+    
+    this(string path, stat_t* buf, string name)
+    {
+        super(path, buf, name);
+        _abspath ~= '/';
     }
 
     int children(int delegate(ref IObject) dg) {
@@ -294,13 +452,74 @@ class PosixDirectory : PosixObject
 
     void _delete()
     {
+        foreach(child; &children) {
+            child._delete();
+        }
         if (rmdir(toStringz(_abspath)) != 0) {
             throw exceptionFromLastError();
         }
     }
-    
+
     Stream open()
     { return null; }
+    IObject create(Variant[string] properties, bool okIfExists, Stream* stream)
+    in
+    {
+        assert("name" in properties);
+        assert("type" in properties);
+        assert(properties["name"].isA!(string));
+        assert(properties["type"].isA!(string));
+    }
+    body
+    {
+        stat_t statBuf;
+        string filename = properties["name"].get!(string);
+        string path = _abspath ~ filename ~ "\0";
+        // reset filename to slice into this path, to remove the ref to the
+        // string in properties
+        filename = path[_abspath.length..$-1];
+        mode_t mode = 0777;
+        Variant* modeProperty = "mode" in properties;
+        if (modeProperty !is null)
+            mode = modeProperty.get!(ushort);
+        IObject object;
+        switch(properties["type"].get!(string)) {
+            case "directory":
+                if (mkdir(path.ptr, mode) != 0) {
+                    if (!okIfExists || errno == EEXIST) {
+                        throw exceptionFromLastError();
+                    }
+                }
+                if (lstat(path.ptr, &statBuf) != 0) {
+                    throw exceptionFromLastError();
+                }
+                if (!S_ISDIR(statBuf.st_mode))
+                    throw exceptionFromLastError(EEXIST);
+                object = new PosixDirectory(path[0..$-1], &statBuf, filename);
+                object[] = properties;
+                break;
+            case "file":
+                int flags = O_CREAT | O_TRUNC | O_RDWR;
+                if (!okIfExists)
+                    flags |= O_EXCL;
+                int fd = .open(path.ptr, flags, mode);
+                    
+                if (fd < 0) {
+                    throw exceptionFromLastError();
+                }
+                if (stream !is null) {
+                    *stream = new FDStream(fd);
+                }
+                scope (exit) if (stream is null) close(fd);
+                if (fstat(fd, &statBuf) != 0)
+                    throw exceptionFromLastError();
+                
+                object = new PosixFile(path[0..$-1], &statBuf, filename);
+                object[] = properties;
+                break;
+        }
+        return object;
+    }
     
 protected:
     string abspath() { return _abspath[0..$-1]; }
@@ -322,6 +541,11 @@ class PosixFile : PosixObject
     this(string path, stat_t* buf)
     {
         super(path, buf);
+    }
+    
+    this(string path, stat_t* buf, string name)
+    {
+        super(path, buf, name);
     }
 
     int children(int delegate(ref IObject) dg) { return 0; }
@@ -357,6 +581,8 @@ class PosixFile : PosixObject
     
     Stream open()
     { return new FileStream(_abspath); }
+    IObject create(Variant[string] properties, bool okIfExists, Stream* stream)
+    { assert(false); }
     
 private:
     static PropertyDetails[string] _properties;

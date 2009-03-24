@@ -43,6 +43,10 @@ void main()
                 Stdout.formatln("{}@{} = {}", cs, p, v.get!(long));
             else if (v.isA!(Time))
                 Stdout.formatln("{}@{} = {}", cs, p, toString(v.get!(Time)));
+            else if (v.isA!(ushort))
+                Stdout.formatln("{}@{} = 0{:o}", cs, p, v.get!(ushort));
+            else if (v.isA!(uint))
+                Stdout.formatln("{}@{} = {}", cs, p, v.get!(uint));
             else
                 Stdout.formatln("{}@{} ({})", cs, p, v);
         }
@@ -60,7 +64,7 @@ void main()
         if (++*count % 1000 == 0) {
             Stdout.formatln("{} {}(s)", *count, type);
         }
-        if (level >= 2)
+        if (level >= 1)
             return;
         try {
             foreach (child; &object.children) {
