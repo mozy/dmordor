@@ -29,17 +29,23 @@ interface IObject
     int references(int delegate(ref IObject) dg);
     int properties(int delegate(ref string, ref bool, ref bool) dg);
     Variant opIndex(string property);
-    Variant[] opIndex(string[] properties);
+    Variant[string] opSlice();
     void opIndexAssign(Variant value, string property);
-    void opIndexAssign(Variant[string] properties);
+    void opSliceAssign(Variant[string] properties);
     void _delete();
     Stream open();
+    IObject create(Variant[string] properties, bool okIfExists = true, Stream* stream = null);
 }
 
-interface IVersionedObject
+interface IVersionedObject : IObject
 {
     int versions(int delegate(ref Time) dg);
     IObject openVersionAtTimestamp(Time timestamp);
+}
+
+// Children are enumerated in order
+interface IOrderedEnumerateObject : IObject
+{   
 }
 
 interface IWatcher

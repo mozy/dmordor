@@ -11,30 +11,8 @@ import mordor.common.log;
 import mordor.common.stringutils;
 import mordor.kalypso.vfs.manager;
 
-version (Windows) {
-    import tango.stdc.stringz;
-    import win32.shellapi;
-    import win32.winbase;
 
-    void main() {
-        int argc;
-        wchar** argsPtr = CommandLineToArgvW(GetCommandLineW(), &argc);
-        if (argsPtr is null)
-            throw exceptionFromLastError();
-        wstring[] args;
-        args.length = argc;
-        foreach(i, arg; argsPtr[0..argc]) {
-            args[i] = fromString16z(arg);            
-        }
-        tmain(args);
-    }
-} else {
-    void main(string[] args) {
-        tmain(args);
-    }
-}
-
-void tmain(tstring[] args)
+void tmain(string[] args)
 {
     Config.loadFromEnvironment();
     Log.root.add(new AppendConsole());
@@ -57,10 +35,8 @@ void tmain(tstring[] args)
 
     args = args[1..$];
     foreach(arg; args) {
-        tstring path = arg;
-        IObject object;
         try {
-            object = vfs.find(path);
+            auto object = vfs.find(arg);
             watcher.watch(object, IWatcher.Events.All);
         } catch (PlatformException ex) {
             Stderr.formatln("{} - {}", arg, ex);

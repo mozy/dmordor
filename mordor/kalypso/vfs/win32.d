@@ -15,6 +15,7 @@ import win32.lmuse;
 import mordor.common.exception;
 import mordor.common.iomanager;
 import mordor.common.streams.file;
+import mordor.common.streams.handle;
 import mordor.common.streams.stream;
 import mordor.common.stringutils;
 import mordor.kalypso.vfs.helpers;
@@ -23,10 +24,26 @@ import mordor.kalypso.vfs.readdirectorychangesw;
 
 private Logger _log, _canonicalizeLog;
 
+private DWORD[string] _attributes;         
+private size_t[string] _timestamps;
+
+
 static this()
 {
     _log = Log.lookup("mordor.kalypso.vfs.win32");
     _canonicalizeLog = Log.lookup("mordor.kalypso.vfs.win32.canonicalize");
+    
+    _attributes["archive"] = FILE_ATTRIBUTE_ARCHIVE;
+    _attributes["compressed"] = FILE_ATTRIBUTE_COMPRESSED;
+    _attributes["encrypted"] = FILE_ATTRIBUTE_ENCRYPTED;
+    _attributes["hidden"] = FILE_ATTRIBUTE_HIDDEN;
+    _attributes["not_content_indexed"] = FILE_ATTRIBUTE_NOT_CONTENT_INDEXED;
+    _attributes["read_only"] = FILE_ATTRIBUTE_READONLY;
+    _attributes["system"] = FILE_ATTRIBUTE_SYSTEM;
+    _attributes["temporary"] = FILE_ATTRIBUTE_TEMPORARY;
+    _timestamps["access_time"] = WIN32_FILE_ATTRIBUTE_DATA.ftLastAccessTime.offsetof;
+    _timestamps["creation_time"] = WIN32_FILE_ATTRIBUTE_DATA.ftCreationTime.offsetof;
+    _timestamps["modification_time"] = WIN32_FILE_ATTRIBUTE_DATA.ftLastWriteTime.offsetof;
 }
 
 // Helper functions
@@ -196,6 +213,86 @@ private IObject find(wstring path)
     return createObject(path[0..lastSlash], &findData, path[lastSlash+1..$]);
 }
 
+private DWORD attributesFromProperties(Variant[string] properties, DWORD* containedAttributes = null)
+{
+    DWORD result;
+    foreach (p, v; properties) {
+        foreach (a, av; _attributes) {
+            if (p == a) {
+                if (containedAttributes !is null)
+                    *containedAttributes |= av;
+                if (v.get!(bool))
+                    result |= av;
+            }
+        }
+    }
+    return result;
+}
+
+private IObject createObject(wstring parent, Variant[string] properties, bool okIfExists, Stream* stream)
+in
+{
+    assert("name" in properties);
+    assert("type" in properties);
+    assert(properties["name"].isA!(string));
+//    assert(properties["type"].isA!(string));
+}
+body
+{
+    BY_HANDLE_FILE_INFORMATION findData;
+    string filename = properties["name"].get!(string);
+    wstring path = parent ~ r"\" ~ toString16(filename) ~ "\0";
+    IObject object;
+    switch(properties["type"].get!(string)) {
+        case "directory":
+            _log.trace("Creating new directory {}", path[0..$-1]);
+            if (!CreateDirectoryW(path.ptr, null)) {
+                if (!okIfExists || GetLastError() != ERROR_ALREADY_EXISTS) {
+                    throw exceptionFromLastError();
+                }
+            }
+            if (!GetFileAttributesExW(path.ptr, GET_FILEEX_INFO_LEVELS.GetFileExInfoStandard, &findData)) {
+                throw exceptionFromLastError();
+            }
+            object = new Win32Directory(path[0..$-1], cast(WIN32_FILE_ATTRIBUTE_DATA*)&findData, filename);
+            object[] = properties;
+            break;
+        case "file":
+            DWORD attributes = attributesFromProperties(properties);
+            bool compressed = !!(attributes & FILE_ATTRIBUTE_COMPRESSED);
+            attributes &= ~FILE_ATTRIBUTE_COMPRESSED;
+            _log.trace("Creating new file {}", path[0..$-1]);
+            HANDLE hFile = CreateFileW(path.ptr,
+                GENERIC_ALL,
+                FILE_SHARE_READ,
+                NULL,
+                okIfExists ? CREATE_ALWAYS : CREATE_NEW,
+                attributes,
+                NULL);
+                
+            if (hFile == INVALID_HANDLE_VALUE) {
+                throw exceptionFromLastError();
+            }
+            if (stream !is null) {
+                *stream = new HandleStream(hFile);
+            }
+            scope (exit) if (stream is null) CloseHandle(hFile);
+            // TODO: set compressed
+            // TODO: set timestamps
+            if (!GetFileInformationByHandle(hFile, &findData))
+                throw exceptionFromLastError();
+            // We're going to pass a WIN32_FILE_ATTRIBUTE_DATA struct to the next function,
+            // but BYHANDLE_FILE_INFORMATION has an extra field in the middle; move things
+            // up before we do the cast
+            findData.dwVolumeSerialNumber = findData.nFileSizeHigh;
+            findData.nFileSizeHigh = findData.nFileSizeLow;
+            
+            object = new Win32File(path[0..$-1], cast(WIN32_FILE_ATTRIBUTE_DATA*)&findData, filename);
+            break;
+    }
+    return object;
+}
+
 private struct PropertyDetails
 {
     bool creatable;
@@ -266,22 +363,22 @@ class Win32VFS : IVFS, IWatchableVFS
     {
         switch (property) {
             case "name":
-                return Variant("win32");
+                return Variant(cast(string)"win32");
             case "type":
                 return Variant("vfs");
             default:
                 return Variant.init;
         }
     }
-    Variant[] opIndex(string[] properties)
+    Variant[string] opSlice()
     {
-        return getProperties(this, properties);
+        return getProperties(this);
     }
     
     void opIndexAssign(Variant value, string property)
     {}
     
-    void opIndexAssign(Variant[string] properties)
+    void opSliceAssign(Variant[string] properties)
     {}
     
     void _delete()
@@ -289,6 +386,8 @@ class Win32VFS : IVFS, IWatchableVFS
     
     Stream open()
     { return null; }
+    IObject create(Variant[string] properties, bool okIfExists, Stream* stream)
+    { assert(false); }
     
     IObject find(string path) {
         return .find(toString16(path));
@@ -366,15 +465,15 @@ class Win32Volume : IObject
                 return Variant.init;            
         }
     }
-    Variant[] opIndex(string[] properties)
+    Variant[string] opSlice()
     {
-        return getProperties(this, properties);
+        return getProperties(this);
     }
     
     void opIndexAssign(Variant value, string property)
     {}
     
-    void opIndexAssign(Variant[string] properties)
+    void opSliceAssign(Variant[string] properties)
     {}
     
     void _delete()
@@ -382,6 +481,11 @@ class Win32Volume : IObject
     
     Stream open()
     { return null; }
+    
+    IObject create(Variant[string] properties, bool okIfExists, Stream* stream)
+    {
+        return createObject(_volume[0..47], properties, okIfExists, stream);
+    }
 
 private:
     static PropertyDetails[string] _properties;
@@ -449,9 +553,9 @@ class Win32Drive : IObject
         }
     }
     
-    Variant[] opIndex(string[] properties)
+    Variant[string] opSlice()
     {
-        return getProperties(this, properties);
+        return getProperties(this);
     }
     
     void opIndexAssign(Variant value, string property)
@@ -468,7 +572,7 @@ class Win32Drive : IObject
         }
     }
     
-    void opIndexAssign(Variant[string] properties)
+    void opSliceAssign(Variant[string] properties)
     {
         foreach(p, v; properties)
             this[p] = v;
@@ -479,6 +583,9 @@ class Win32Drive : IObject
     
     Stream open()
     { return null; }
+
+    IObject create(Variant[string] properties, bool okIfExists, Stream* stream)
+    { assert(false); }
     
 private:
     static PropertyDetails[string] _properties;
@@ -548,14 +655,14 @@ class Win32UNCShare : IObject
                 return Variant.init;            
         }
     }
-    Variant[] opIndex(string[] properties)
+    Variant[string] opSlice()
     {
-        return getProperties(this, properties);
+        return getProperties(this);
     }
     
     void opIndexAssign(Variant value, string property)
     {}
-    void opIndexAssign(Variant[string] properties)
+    void opSliceAssign(Variant[string] properties)
     {}
     
     void _delete()
@@ -563,6 +670,11 @@ class Win32UNCShare : IObject
     
     Stream open()
     { return null; }
+    
+    IObject create(Variant[string] properties, bool okIfExists, Stream* stream)
+    {
+        return createObject(_serverAndShare[0..$-1], properties, okIfExists, stream);
+    }
 
 private:
     static PropertyDetails[string] _properties;
@@ -575,23 +687,18 @@ class Win32Object : IObject
         _properties["name"] = PropertyDetails(false, true);
         _properties["absolute_path"] = PropertyDetails(false, false);
         _properties["type"] = PropertyDetails(false, false);
-        _attributes["archive"] = FILE_ATTRIBUTE_ARCHIVE;
-        _attributes["compressed"] = FILE_ATTRIBUTE_COMPRESSED;
-        _attributes["encrypted"] = FILE_ATTRIBUTE_ENCRYPTED;
-        _attributes["hidden"] = FILE_ATTRIBUTE_HIDDEN;
-        _attributes["not_content_indexed"] = FILE_ATTRIBUTE_NOT_CONTENT_INDEXED;
-        _attributes["read_only"] = FILE_ATTRIBUTE_READONLY;
-        _attributes["system"] = FILE_ATTRIBUTE_SYSTEM;
-        _attributes["temporary"] = FILE_ATTRIBUTE_TEMPORARY;
-        _timestamps["access_time"] = WIN32_FILE_ATTRIBUTE_DATA.ftLastAccessTime.offsetof;
-        _timestamps["creation_time"] = WIN32_FILE_ATTRIBUTE_DATA.ftCreationTime.offsetof;
-        _timestamps["modification_time"] = WIN32_FILE_ATTRIBUTE_DATA.ftLastWriteTime.offsetof;
     }
 
     this(WIN32_FILE_ATTRIBUTE_DATA* findData, wstring name)
     {
         _findData = *findData;
         _name = tango.text.convert.Utf.toString(name);
+    }
+    
+    this(WIN32_FILE_ATTRIBUTE_DATA* findData, string name)
+    {
+        _findData = *findData;
+        _name = name;
     }
 
     IObject parent()
@@ -638,9 +745,9 @@ class Win32Object : IObject
                 return Variant.init;
         }
     }
-    Variant[] opIndex(string[] properties)
+    Variant[string] opSlice()
     {
-        return getProperties(this, properties);
+        return getProperties(this);
     }
     
     private void handleProperty(string property,
@@ -718,7 +825,7 @@ class Win32Object : IObject
                 FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                 NULL,
                 OPEN_EXISTING,
-                0,
+                FILE_FLAG_BACKUP_SEMANTICS,
                 NULL);
             if (hFile == INVALID_HANDLE_VALUE)
                 throw exceptionFromLastError();
@@ -739,7 +846,7 @@ class Win32Object : IObject
             pNewAtime, pNewMtime, pNewCtime);
     }
 
-    void opIndexAssign(Variant[string] properties)
+    void opSliceAssign(Variant[string] properties)
     {
         DWORD newAttributes = _findData.dwFileAttributes;
         FILETIME newAtime, newMtime, newCtime;
@@ -754,6 +861,7 @@ class Win32Object : IObject
     
     abstract void _delete();
     abstract Stream open();
+    abstract IObject create(Variant[string] properties, bool okIfExists, Stream* stream);
     
 protected:
     wstring abspath() { return _abspath; }
@@ -770,8 +878,6 @@ private:
 
 private:
     static PropertyDetails[string] _properties;
-    static DWORD[string] _attributes;         
-    static size_t[string] _timestamps;
 
 protected:
     string _name;
@@ -779,12 +885,18 @@ protected:
     wstring _abspath;
 }
 
-class Win32Directory : Win32Object
+class Win32Directory : Win32Object, IOrderedEnumerateObject
 {
     this(wstring parent, WIN32_FILE_ATTRIBUTE_DATA* findData, wstring name)
     {
         super(findData, name);
         _abspath = parent ~ r"\" ~ name ~ r"\*";
+    }
+    
+    this(wstring abspath, WIN32_FILE_ATTRIBUTE_DATA* findData, string name)
+    {
+        super(findData, name);
+        _abspath = abspath ~ r"\*";
     }
     
     int children(int delegate(ref IObject) dg) {
@@ -812,7 +924,7 @@ class Win32Directory : Win32Object
     {
         switch (property) {
             case "type":
-                return Variant("directory");
+                return Variant(cast(string)"directory");
             default:
                 return super[property];
         }
@@ -820,13 +932,22 @@ class Win32Directory : Win32Object
     
     void _delete()
     {
-        if (!RemoveDirectoryW(toString16z(_abspath))) {
+        _log.trace("Deleting directory {}", abspath);
+        foreach(child; &children) {
+            child._delete();
+        }
+        if (!RemoveDirectoryW(toString16z(abspath))) {
             throw exceptionFromLastError();
         }
     }
     
     Stream open()
     { return null; }
+    
+    IObject create(Variant[string] properties, bool okIfExists, Stream* stream)
+    {
+        return createObject(abspath, properties, okIfExists, stream);
+    }
 
 protected:
     wstring abspath() { return _abspath[0..$-2]; }
@@ -842,6 +963,12 @@ class Win32File : Win32Object
     {
         super(findData, name);
         _abspath = parent ~ r"\" ~ name;
+    }
+    
+    this(wstring abspath, WIN32_FILE_ATTRIBUTE_DATA* findData, string name)
+    {
+        super(findData, name);
+        _abspath = abspath;
     }
     
     int children(int delegate(ref IObject) dg)
@@ -868,7 +995,7 @@ class Win32File : Win32Object
             case "size":
                 return Variant((cast(long)_findData.nFileSizeHigh << 32) | cast(long)_findData.nFileSizeLow);
             case "type":
-                return Variant("file");
+                return Variant(cast(string)"file");
             default:
                 return super[property];
         }
@@ -876,6 +1003,7 @@ class Win32File : Win32Object
     
     void _delete()
     {
+        _log.trace("Deleting {}", abspath);
         if (!DeleteFileW(toString16z(_abspath))) {
             throw exceptionFromLastError();
         }
@@ -885,6 +1013,9 @@ class Win32File : Win32Object
     {
         return new FileStream(_abspath);
     }
+    
+    IObject create(Variant[string] properties, bool okIfExists, Stream* stream)
+    { assert(false); }
 
 private:
     static PropertyDetails[string] _properties;

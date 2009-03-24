@@ -28,12 +28,12 @@ string getFullPath(IObject object)
     return ret;
 }
 
-Variant[] getProperties(IObject object, string[] properties)
+Variant[string] getProperties(IObject object)
 {
-    Variant[] values;
-    values.length = properties.length;
-    foreach(i, p; properties) {
-        values[i] = object[p];
+    Variant[string] properties;
+    foreach(p, c, s; &object.properties)
+    {
+        properties[p] = object[p];
     }
-    return values;
+    return properties;
 }
