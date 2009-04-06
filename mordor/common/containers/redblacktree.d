@@ -20,7 +20,7 @@ int defaultCmp(T)(ref T lhs, ref T rhs)
 
 class RedBlackTree(T, alias cmp = defaultCmp!(T), bool includeSize = true)
 {
-private:
+protected:
     enum Color
     {
         Red,
@@ -216,6 +216,23 @@ public:
         }
     }
     
+    Iterator find(T v)
+    {
+        Node* node = root;
+        int result;
+        while (node != leaf) {
+            result = cmp(v, node.val);
+            if (result == 0) {
+                return Iterator(node);
+            } else if (result < 0) {
+                node = node.left;
+            } else {
+                node = node.right;
+            }
+        }
+        return end;
+    }
+    
     // void erase(Iterator it)
     
     void clear()
@@ -301,9 +318,11 @@ private:
         return node;            
     }
     
-private:
+protected:
     Node* root;
     static Node* leaf() { return cast(Node*)&_leaf; }
+
+private:
     static const Leaf _leaf;
 
     invariant()
@@ -388,6 +407,13 @@ unittest
   
   tree.insert(11);
   isEqualTree(tree, [1, 8, 11, 13]);
+  
+  auto it = tree.find(8);
+  assert(it != tree.end);
+  assert(it.val == 8);
+  
+  it = tree.find(7);
+  assert(it == tree.end);
 }
 
 
@@ -408,6 +434,40 @@ public:
     void opIndexAssign(V v, K k)
     {
         insert(Pair!(K, V)(k, v));
+    }
+    
+    Iterator find(K k)
+    {
+        Node* node = root;
+        int result;
+        while (node != leaf) {
+            result = cmp(k, node.val.key);
+            if (result == 0) {
+                return Iterator(node);
+            } else if (result < 0) {
+                node = node.left;
+            } else {
+                node = node.right;
+            }
+        }
+        return end;
+    }
+    
+    V* opIn_r(K k)
+    {
+        Node* node = root;
+        int result;
+        while (node != leaf) {
+            result = cmp(k, node.val.key);
+            if (result == 0) {
+                return &node.val.value;
+            } else if (result < 0) {
+                node = node.left;
+            } else {
+                node = node.right;
+            }
+        }
+        return null;
     }
 }
 
@@ -447,4 +507,18 @@ unittest
     
     map[11] = 4;
     isEqualMap(map, [1:2, 8:3, 11:4, 13:1]);
+    
+    auto it = map.find(13);
+    assert(it != map.end);
+    assert(it.val.key == 13);
+    
+    it = map.find(14);
+    assert(it == map.end);
+    
+    auto v = 13 in map;
+    assert(v !is null);
+    assert(*v == 1);
+    
+    v = 14 in map;
+    assert(v is null);
 }
