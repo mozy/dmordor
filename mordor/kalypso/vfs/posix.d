@@ -391,7 +391,7 @@ protected:
     }
 }
 
-class PosixDirectory : PosixObject, IOrderedEnumerateObject
+class PosixDirectory : PosixObject, IObject
 {
     this(string parent, dirent* ent)
     {

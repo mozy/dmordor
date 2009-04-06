@@ -423,12 +423,12 @@ struct Pair(K, V)
     V value;
 }
 
-int mapCmp(K, V, alias cmp = defaultCmp!(K))(ref Pair!(K, V) lhs, ref Pair!(K, V) rhs)
+int mapCmp(K, V, alias cmp = defaultCmp)(ref Pair!(K, V) lhs, ref Pair!(K, V) rhs)
 {
     return cmp(lhs.key, rhs.key);
 }
 
-class OrderedMap(K, V, alias cmp = defaultCmp!(K), bool includeSize = true) : RedBlackTree!(Pair!(K, V), mapCmp!(K, V, cmp), includeSize)
+class OrderedMap(K, V, alias cmp = defaultCmp, bool includeSize = true) : RedBlackTree!(Pair!(K, V), mapCmp!(K, V, cmp), includeSize)
 {
 public:
     void opIndexAssign(V v, K k)
@@ -468,6 +468,16 @@ public:
             }
         }
         return null;
+    }
+    
+    int opApply(int delegate(ref K, ref V) dg)
+    {
+        int ret;
+        foreach(pair; super)
+        {
+            if ( (ret = dg(pair.key, pair.value)) != 0) return ret;
+        }
+        return ret;
     }
 }
 
@@ -518,6 +528,9 @@ unittest
     auto v = 13 in map;
     assert(v !is null);
     assert(*v == 1);
+    
+    *v = 5;
+    isEqualMap(map, [1:2, 8:3, 11:4, 13:5]);
     
     v = 14 in map;
     assert(v is null);
