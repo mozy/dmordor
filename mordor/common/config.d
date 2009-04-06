@@ -156,10 +156,8 @@ private:
     static ConfigVarBase[string] _vars;
 }
 
-import tango.io.Stdout;
 unittest
 {
-    Stdout.formatln("in config unit test");
     ConfigVar!(int) intVar = Config.lookup("myvar", 5, "mysetting");
     
     assert(intVar.val == 5);

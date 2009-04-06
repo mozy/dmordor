@@ -109,7 +109,7 @@ void mirror(IObject src, IObject dst)
 
 debug (mirror) {
     import tango.util.log.AppendConsole;
-    
+
     import mordor.common.config;
     import mordor.common.log;
     import mordor.kalypso.vfs.manager;

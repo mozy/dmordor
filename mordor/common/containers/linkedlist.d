@@ -17,7 +17,7 @@ private:
     }
 
 public:
-    struct Iterator
+    static struct Iterator
     {
     public:
         T val() { return _node._val; }
