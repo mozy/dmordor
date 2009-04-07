@@ -18,7 +18,7 @@ int defaultCmp(T)(ref T lhs, ref T rhs)
     }
 }
 
-class RedBlackTree(T, alias cmp = defaultCmp!(T), bool includeSize = true)
+class RedBlackTree(T, alias cmp = defaultCmp, bool includeSize = true)
 {
 protected:
     enum Color
@@ -394,26 +394,40 @@ private void dumpTree(T)(RedBlackTree!(T) tree)
 
 unittest
 {
-  RedBlackTree!(int) tree = new RedBlackTree!(int)();
-  isEqualTree(tree, cast(int[])[]);
-  tree.insert(13);
-  isEqualTree(tree, [13]);
+    RedBlackTree!(char[]) tree = new RedBlackTree!(char[])();
+    isEqualTree(tree, cast(char[][])[]);
+    tree.insert("red");
+    isEqualTree(tree, ["red"]);
+    
+    tree.insert("black");
+    isEqualTree(tree, ["black", "red"]);
+    
+    tree.insert("green");
+    isEqualTree(tree, ["black", "green", "red"]);
+}    
+
+unittest
+{
+    RedBlackTree!(int) tree = new RedBlackTree!(int)();
+    isEqualTree(tree, cast(int[])[]);
+    tree.insert(13);
+    isEqualTree(tree, [13]);
   
-  tree.insert(1);
-  isEqualTree(tree, [1, 13]);
+    tree.insert(1);
+    isEqualTree(tree, [1, 13]);
   
-  tree.insert(8);
-  isEqualTree(tree, [1, 8, 13]);
+    tree.insert(8);
+    isEqualTree(tree, [1, 8, 13]);
   
-  tree.insert(11);
-  isEqualTree(tree, [1, 8, 11, 13]);
+    tree.insert(11);
+    isEqualTree(tree, [1, 8, 11, 13]);
   
-  auto it = tree.find(8);
-  assert(it != tree.end);
-  assert(it.val == 8);
+    auto it = tree.find(8);
+    assert(it != tree.end);
+    assert(it.val == 8);
   
-  it = tree.find(7);
-  assert(it == tree.end);
+    it = tree.find(7);
+    assert(it == tree.end);
 }
 
 

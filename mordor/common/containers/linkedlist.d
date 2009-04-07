@@ -219,8 +219,7 @@ private:
             node = node._next;
             static if(includeSize) ++s;
         } while (node != head)
-        --s;
-        static if(includeSize) assert(_size == s);
+        static if(includeSize) assert(_size == --s);
     }
 }
 

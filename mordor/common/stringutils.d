@@ -1,5 +1,7 @@
 module mordor.common.stringutils;
 
+import mordor.common.containers.redblacktree;
+
 alias char[] string;
 alias wchar[] wstring;
 
@@ -73,3 +75,8 @@ bool isHexString(string str)
     }
     return true;
 }
+
+alias RedBlackTree!(string) StringSet;
+// TODO: really case insensitive
+alias StringSet IStringSet;
+
