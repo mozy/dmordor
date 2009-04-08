@@ -27,6 +27,15 @@ private string[] _methodStrings = [
     "OPTIONS",
     "TRACE"];
 
+package Method parseHttpMethod(string method)
+{
+    foreach(i, m; _methodStrings) {
+        if (method == m)
+            return cast(Method)i;
+    }
+    throw new Exception("invalid method" ~ method);
+}
+
 enum Status
 {
     CONTINUE                         = 100,
@@ -95,7 +104,7 @@ struct Version
     {
         if (str.length < 8 || str[0..5] != "HTTP/")
             throw new ConversionException("Version number does not start with HTTP/");
-        string[] parts = split(str[6..$], ".");
+        string[] parts = split(str[5..$], ".");
         if (parts.length != 2)
             throw new ConversionException("Not enough pieces for an HTTP version number.");
         return Version(to!(ubyte)(parts[0]), to!(ubyte)(parts[1]));
@@ -117,12 +126,12 @@ struct RequestLine
 struct StatusLine
 {
     Status status;
+    string reason;
     Version ver;
-    
+
     string toString()
     {
-        // TODO: status text
-        return ver.toString() ~ " " ~ to!(string)(cast(int)status);
+        return ver.toString() ~ " " ~ to!(string)(cast(int)status) ~ " " ~ reason;
     }
 }
 

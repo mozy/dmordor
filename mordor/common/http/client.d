@@ -1,12 +1,25 @@
 module mordor.common.http.client;
 
 import tango.core.Thread;
+import tango.util.log.Log;
 
 import mordor.common.containers.linkedlist;
 public import mordor.common.http.http;
+import mordor.common.http.parser;
 import mordor.common.scheduler;
-public import mordor.common.streams.stream;
+import mordor.common.streams.buffered;
+import mordor.common.streams.duplex;
+import mordor.common.streams.singleplex;
+import mordor.common.streams.singleplexer;
+import mordor.common.streams.stream;
 import mordor.common.stringutils;
+
+private Logger _log;
+
+static this()
+{
+    _log = Log.lookup("mordor.common.http.client");
+}
 
 class Connection
 {
@@ -22,6 +35,12 @@ class Connection
         _pendingRequests = new LinkedList!(FiberAndScheduler, false)();
         _pendingResponses = new LinkedList!(FiberAndScheduler, false)();
         _stream = stream;
+        _getStream = cast(BufferedStream)stream;
+        if (_getStream is null) {
+            _getStream = new BufferedStream(new SingleplexStream(stream, SingleplexStream.Type.READ));
+            _stream = new DuplexStream(_getStream, new SingleplexStream(stream, SingleplexStream.Type.WRITE));
+        }
+        _getStream.allowPartialReads = true;
     }
     
     void request(Request requestHeaders, void delegate(Stream) request,
@@ -92,12 +111,12 @@ class Connection
                 if (general.connection is null) {
                     if (requestLine.ver == Version(1, 0)) {
                         general.connection = new IStringSet();
-                        general.connection.insert("keep-alive");
+                        general.connection.insert("Keep-Alive");
                     }
                 }
                 // Determine if we're closing the connection after this request
                 if (requestLine.ver == Version(1, 0)) {
-                    if (general.connection !is null && general.connection.find("keep-alive") != general.connection.end) {
+                    if (general.connection !is null && general.connection.find("Keep-Alive") != general.connection.end) {
                         close = false;
                     } else {
                         close = true;
@@ -112,6 +131,7 @@ class Connection
                 
             }
             string requestHeadersString = requestHeaders.toString();
+            _log.trace("Sending request {}", requestHeadersString);
             _stream.write(requestHeadersString);
             // TODO: write request headers
             if (requestStream !is null)
@@ -168,7 +188,33 @@ class Connection
             
             Response responseHeaders;
             Stream responseStream = _stream;
-            // TODO: read HTTP headers
+            // Read and parse headers
+            scope parser = new ResponseParser(responseHeaders);
+            parser.init();
+            scope buffer = new Buffer();
+            while (!parser.complete && !parser.error) {
+                buffer.consume(buffer.readAvailable);
+                // TODO: limit total amount read
+                size_t read = _getStream.read(buffer, 65536);
+                if (read == 0) {
+                    parser.run([], true);
+                } else {
+                    void[][] bufs = buffer.readBufs;
+                    while (bufs.length > 0) {
+                        size_t consumed = parser.run(cast(char[])bufs[0], false);
+                        buffer.consume(consumed);
+                        if (parser.complete || parser.error)
+                            break;
+                        bufs = bufs[1..$];
+                    }
+                }
+            }
+            _getStream.unread(buffer, buffer.readAvailable);
+            buffer.clear();
+            if (parser.error) {
+                throw new Exception("Error parsing response");
+            }
+            _log.trace("Got response {}", responseHeaders.toString());
             with (responseHeaders) {
                 if (status.ver == Version(1, 0)) {
                     if (general.connection is null || general.connection.find("keep-alive") == general.connection.end)
@@ -196,6 +242,7 @@ private:
         Scheduler scheduler;
     }
 private:
+    BufferedStream _getStream;
     Stream _stream;
     Exception _requestException, _responseException;
     LinkedList!(FiberAndScheduler, false) _pendingRequests;

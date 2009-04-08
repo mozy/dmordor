@@ -226,7 +226,7 @@ public:
 
     void unread(Buffer b, size_t len)
     {
-        scope Buffer buf;
+        scope buf = new Buffer;
         buf.copyIn(b, len);
         buf.copyIn(_readBuffer);
         _readBuffer.clear();
