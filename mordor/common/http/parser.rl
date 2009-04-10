@@ -158,11 +158,21 @@ private:
             requestLine.uri = mark[0..fpc - mark];
             mark = null;
         }
+        
+        action set_host {
+            _headerHandled = true;
+            _string = &request.host;
+        }
+
+        # TODO: Parse and save the port
+        Host = 'Host:' @set_host LWS* hostport >mark %save_string LWS*;
+        
+        request_header = Host;
     
         Method = token >mark %parse_Method;
         Request_URI = ( "*" | absoluteURI | hier_part | authority) >mark %parse_Request_URI;
         Request_Line = Method SP Request_URI SP HTTP_Version CRLF;
-        Request = Request_Line ((general_header | message_header) CRLF)* CRLF %*done;
+        Request = Request_Line ((general_header | request_header | message_header) CRLF)* CRLF %*done;
     
         main := Request;
         write data;
@@ -205,7 +215,8 @@ private:
     Request* _request;
     bool _headerHandled;
     string _fieldName;
-    IStringSet _list;    
+    IStringSet _list;
+    string* _string;
     static Logger _log;
 }
 
@@ -234,11 +245,6 @@ private:
         action set_location {
             _headerHandled = true;
             _string = &response.location;
-        }
-        
-        action save_string {
-            *_string = mark[0..fpc - mark];
-            mark = null;
         }
         
         Location = 'Location:' @set_location LWS* absoluteURI >mark %save_string LWS*;

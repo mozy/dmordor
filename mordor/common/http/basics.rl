@@ -83,6 +83,11 @@
     field_value = TEXT* >mark %parse_field_value;
     message_header = field_name ":" field_value;
     
+    action save_string {
+        *_string = mark[0..fpc - mark];
+        mark = null;
+    }
+    
     action save_element {
         _list.insert(mark[0..fpc-mark]);
         mark = null;
