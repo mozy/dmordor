@@ -212,6 +212,7 @@ private:
     string _fieldName;
     IStringSet _list;
     string* _string;
+    ulong* _ulong;
     static Logger _log;
 }
 
@@ -252,6 +253,7 @@ private:
         Response = Status_Line ((general_header | response_header | entity_header) CRLF)* CRLF %*done;
     
         main := Response;
+
         write data;
     }%%
 
@@ -294,5 +296,6 @@ private:
     string _fieldName;
     IStringSet _list;
     string* _string;
+    ulong* _ulong;
     static Logger _log;
 }

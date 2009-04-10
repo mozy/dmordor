@@ -227,7 +227,7 @@ class Connection
                     if (general.connection !is null && general.connection.find("close") != general.connection.end)
                         close = true;
                 } else {
-                    //throw new Exception("Unrecognized HTTP server version.");
+                    throw new Exception("Unrecognized HTTP server version.");
                 }
             }
             response(responseHeaders, responseStream);

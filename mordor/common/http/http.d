@@ -176,11 +176,15 @@ struct ResponseHeaders
 
 struct EntityHeaders
 {
+    ulong contentLength = ~0;
     string[string] extension;
 
     string toString()
     {
         string ret;
+        if (contentLength != ~0) {
+            ret ~= "Content-Length: " ~ to!(string)(contentLength) ~ "\r\n";
+        }
         foreach(k,v; extension) {
             ret ~= k ~ ": " ~ v ~ "\r\n";
         }

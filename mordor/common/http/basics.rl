@@ -92,6 +92,10 @@
         *_string = mark[0..fpc - mark];
         mark = null;
     }
+    action save_ulong {
+        *_ulong = to!(ulong)(mark[0..fpc - mark]);
+        mark = null;
+    }
     
     action save_element {
         _list.insert(mark[0..fpc-mark]);
@@ -106,7 +110,7 @@
     
     action set_connection_list {
         if (general.connection is null) {
-            general.connection = new RedBlackTree!(string)();
+            general.connection = new IStringSet();
         }
         _headerHandled = true;
         _list = general.connection;
@@ -116,8 +120,15 @@
     
     general_header = Connection;
     
+    action set_content_length {
+        _headerHandled = true;
+        _ulong = &entity.contentLength;
+    }
+    
+    Content_Length = 'Content-Length:' @set_content_length . LWS* . DIGIT+ >mark %save_ulong LWS*;
+    
     extension_header = message_header;
 
-    entity_header = extension_header;
+    entity_header = Content_Length | extension_header;
 
 }%%
