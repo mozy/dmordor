@@ -689,28 +689,33 @@ _match:
         } else {
             char[] fieldValue = mark[0..p - mark];
             unfold(fieldValue);
-            this[_fieldName] = fieldValue;
+            string* value = _fieldName in entity.extension;
+            if (value is null) {
+                entity.extension[_fieldName] = fieldValue;
+            } else {
+                *value ~= ", " ~ fieldValue;
+            }
             //    fgoto *http_request_parser_error;
             mark = null;
         }
     }
 	break;
 	case 5:
-#line 86 "parser.rl"
+#line 91 "parser.rl"
 	{
         *_string = mark[0..p - mark];
         mark = null;
     }
 	break;
 	case 6:
-#line 91 "parser.rl"
+#line 96 "parser.rl"
 	{
         _list.insert(mark[0..p-mark]);
         mark = null;
     }
 	break;
 	case 8:
-#line 102 "parser.rl"
+#line 107 "parser.rl"
 	{
         if (general.connection is null) {
             general.connection = new RedBlackTree!(string)();
@@ -741,7 +746,7 @@ _match:
             _string = &request.host;
         }
 	break;
-#line 745 "parser.d"
+#line 750 "parser.d"
 		default: break;
 		}
 	}
@@ -759,13 +764,13 @@ _again:
 	while ( __nacts-- > 0 ) {
 		switch ( *__acts++ ) {
 	case 7:
-#line 95 "parser.rl"
+#line 100 "parser.rl"
 	{
         _list.insert(mark[0..pe-mark]);
         mark = null;
     }
 	break;
-#line 769 "parser.d"
+#line 774 "parser.d"
 		default: break;
 		}
 	}
@@ -789,12 +794,7 @@ public:
         return cs == http_request_parser_error;
     }
 
-private:
-    void opIndexAssign(char[] fieldName, char[] fieldValue)
-    {
-        // TODO: set the header
-    }
-    
+private:    
     Request* _request;
     bool _headerHandled;
     string _fieldName;
@@ -1071,7 +1071,7 @@ static const int http_response_parser_error = 0;
 
 static const int http_response_parser_en_main = 1;
 
-#line 261 "parser.rl"
+#line 256 "parser.rl"
 
 
 public:
@@ -1083,7 +1083,7 @@ public:
 	{
 	cs = http_response_parser_start;
 	}
-#line 268 "parser.rl"
+#line 263 "parser.rl"
     }
 
 protected:
@@ -1206,28 +1206,33 @@ _match:
         } else {
             char[] fieldValue = mark[0..p - mark];
             unfold(fieldValue);
-            this[_fieldName] = fieldValue;
+            string* value = _fieldName in entity.extension;
+            if (value is null) {
+                entity.extension[_fieldName] = fieldValue;
+            } else {
+                *value ~= ", " ~ fieldValue;
+            }
             //    fgoto *http_request_parser_error;
             mark = null;
         }
     }
 	break;
 	case 5:
-#line 86 "parser.rl"
+#line 91 "parser.rl"
 	{
         *_string = mark[0..p - mark];
         mark = null;
     }
 	break;
 	case 6:
-#line 91 "parser.rl"
+#line 96 "parser.rl"
 	{
         _list.insert(mark[0..p-mark]);
         mark = null;
     }
 	break;
 	case 8:
-#line 102 "parser.rl"
+#line 107 "parser.rl"
 	{
         if (general.connection is null) {
             general.connection = new RedBlackTree!(string)();
@@ -1237,27 +1242,27 @@ _match:
     }
 	break;
 	case 9:
-#line 235 "parser.rl"
+#line 230 "parser.rl"
 	{
             status.status = cast(Status)to!(int)(mark[0..p - mark]);
             mark = null;
         }
 	break;
 	case 10:
-#line 240 "parser.rl"
+#line 235 "parser.rl"
 	{
             status.reason = mark[0..p - mark];
             mark = null;
         }
 	break;
 	case 11:
-#line 245 "parser.rl"
+#line 240 "parser.rl"
 	{
             _headerHandled = true;
             _string = &response.location;
         }
 	break;
-#line 1261 "parser.d"
+#line 1266 "parser.d"
 		default: break;
 		}
 	}
@@ -1275,13 +1280,13 @@ _again:
 	while ( __nacts-- > 0 ) {
 		switch ( *__acts++ ) {
 	case 7:
-#line 95 "parser.rl"
+#line 100 "parser.rl"
 	{
         _list.insert(mark[0..pe-mark]);
         mark = null;
     }
 	break;
-#line 1285 "parser.d"
+#line 1290 "parser.d"
 		default: break;
 		}
 	}
@@ -1289,7 +1294,7 @@ _again:
 
 	_out: {}
 	}
-#line 276 "parser.rl"
+#line 271 "parser.rl"
             }
         }
     }
@@ -1310,12 +1315,7 @@ public:
         return cs == http_response_parser_error;
     }
 
-private:
-    void opIndexAssign(char[] fieldName, char[] fieldValue)
-    {
-        // TODO: set the header
-    }
-    
+private:    
     Response* _response;
     bool _headerHandled;
     string _fieldName;

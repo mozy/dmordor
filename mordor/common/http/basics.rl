@@ -62,25 +62,30 @@
     other_range_unit = token;
     range_unit = bytes_unit | other_range_unit;
 
-    action parse_field_name {
+    action save_field_name {
         _fieldName = mark[0..fpc - mark];
         mark = null;
     }
-    action parse_field_value {
+    action save_field_value {
         if (_headerHandled) {
             _headerHandled = false;
         } else {
             char[] fieldValue = mark[0..fpc - mark];
             unfold(fieldValue);
-            this[_fieldName] = fieldValue;
+            string* value = _fieldName in entity.extension;
+            if (value is null) {
+                entity.extension[_fieldName] = fieldValue;
+            } else {
+                *value ~= ", " ~ fieldValue;
+            }
             //    fgoto *http_request_parser_error;
             mark = null;
         }
     }
 
     field_chars = OCTET -- (CTL | CR LF SP HT);
-    field_name = token >mark %parse_field_name;
-    field_value = TEXT* >mark %parse_field_value;
+    field_name = token >mark %save_field_name;
+    field_value = TEXT* >mark %save_field_value;
     message_header = field_name ":" field_value;
     
     action save_string {
@@ -110,5 +115,9 @@
     Connection = 'Connection:' @set_connection_list . list;
     
     general_header = Connection;
+    
+    extension_header = message_header;
+
+    entity_header = extension_header;
 
 }%%

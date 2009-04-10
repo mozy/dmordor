@@ -176,9 +176,15 @@ struct ResponseHeaders
 
 struct EntityHeaders
 {
+    string[string] extension;
+
     string toString()
     {
-        return "";
+        string ret;
+        foreach(k,v; extension) {
+            ret ~= k ~ ": " ~ v ~ "\r\n";
+        }
+        return ret;
     }
 }
 

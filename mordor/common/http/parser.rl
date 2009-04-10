@@ -172,7 +172,7 @@ private:
         Method = token >mark %parse_Method;
         Request_URI = ( "*" | absoluteURI | hier_part | authority) >mark %parse_Request_URI;
         Request_Line = Method SP Request_URI SP HTTP_Version CRLF;
-        Request = Request_Line ((general_header | request_header | message_header) CRLF)* CRLF %*done;
+        Request = Request_Line ((general_header | request_header | entity_header) CRLF)* CRLF %*done;
     
         main := Request;
         write data;
@@ -206,12 +206,7 @@ public:
         return cs == http_request_parser_error;
     }
 
-private:
-    void opIndexAssign(char[] fieldName, char[] fieldValue)
-    {
-        // TODO: set the header
-    }
-    
+private:    
     Request* _request;
     bool _headerHandled;
     string _fieldName;
@@ -254,7 +249,7 @@ private:
         Status_Code = DIGIT{3} > mark %parse_Status_Code;
         Reason_Phrase = (TEXT -- (CR | LF))* >mark %parse_Reason_Phrase;
         Status_Line = HTTP_Version SP Status_Code SP Reason_Phrase CRLF;
-        Response = Status_Line ((general_header | response_header | message_header) CRLF)* CRLF %*done;
+        Response = Status_Line ((general_header | response_header | entity_header) CRLF)* CRLF %*done;
     
         main := Response;
         write data;
@@ -293,12 +288,7 @@ public:
         return cs == http_response_parser_error;
     }
 
-private:
-    void opIndexAssign(char[] fieldName, char[] fieldValue)
-    {
-        // TODO: set the header
-    }
-    
+private:    
     Response* _response;
     bool _headerHandled;
     string _fieldName;
