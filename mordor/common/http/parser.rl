@@ -9,6 +9,7 @@ import tango.text.Util;
 import tango.util.Convert;
 import tango.util.log.Log;
 
+import mordor.common.containers.redblacktree;
 import mordor.common.ragel;
 import mordor.common.http.http;
 import mordor.common.stringutils;
@@ -161,7 +162,7 @@ private:
         Method = token >mark %parse_Method;
         Request_URI = ( "*" | absoluteURI | hier_part | authority) >mark %parse_Request_URI;
         Request_Line = Method SP Request_URI SP HTTP_Version CRLF;
-        Request = Request_Line (message_header)* CRLF %*done;
+        Request = Request_Line ((general_header | message_header) CRLF)* CRLF %*done;
     
         main := Request;
         write data;
@@ -202,7 +203,9 @@ private:
     }
     
     Request* _request;
+    bool _headerHandled;
     string _fieldName;
+    IStringSet _list;    
     static Logger _log;
 }
 
@@ -226,11 +229,11 @@ private:
             status.reason = mark[0..fpc - mark];
             mark = null;
         }
-
+        
         Status_Code = DIGIT{3} > mark %parse_Status_Code;
         Reason_Phrase = (TEXT -- (CR | LF))* >mark %parse_Reason_Phrase;
         Status_Line = HTTP_Version SP Status_Code SP Reason_Phrase CRLF;
-        Response = Status_Line (message_header)* CRLF %*done;
+        Response = Status_Line ((general_header | message_header) CRLF)* CRLF %*done;
     
         main := Response;
         write data;
@@ -276,6 +279,8 @@ private:
     }
     
     Response* _response;
+    bool _headerHandled;
     string _fieldName;
+    IStringSet _list;    
     static Logger _log;
 }

@@ -10,6 +10,7 @@ import tango.text.Util;
 import tango.util.Convert;
 import tango.util.log.Log;
 
+import mordor.common.containers.redblacktree;
 import mordor.common.ragel;
 import mordor.common.http.http;
 import mordor.common.stringutils;
@@ -84,7 +85,7 @@ private class NeedQuote : RagelParser
 {
 private:
 
-#line 88 "parser.d"
+#line 89 "parser.d"
 static const byte[] _need_quote_key_offsets = [
 	0, 0, 15
 ];
@@ -120,17 +121,17 @@ static const int need_quote_error = 0;
 
 static const int need_quote_en_main = 1;
 
-#line 90 "parser.rl"
+#line 91 "parser.rl"
 
 public:
     void init() {
         super.init();
         
-#line 130 "parser.d"
+#line 131 "parser.d"
 	{
 	cs = need_quote_start;
 	}
-#line 95 "parser.rl"
+#line 96 "parser.rl"
     }
     bool complete() {
         return cs >= need_quote_first_final;
@@ -141,7 +142,7 @@ public:
 protected:
     void exec() {
         
-#line 145 "parser.d"
+#line 146 "parser.d"
 	{
 	int _klen;
 	uint _trans;
@@ -210,7 +211,7 @@ _match:
 	_test_eof: {}
 	_out: {}
 	}
-#line 105 "parser.rl"
+#line 106 "parser.rl"
     }
 };
 
@@ -252,18 +253,21 @@ class RequestParser : RagelParser
     }
 private:
     
-#line 256 "parser.d"
+#line 257 "parser.d"
 static const byte[] _http_request_parser_actions = [
 	0, 1, 0, 1, 1, 1, 2, 1, 
-	3, 1, 4, 1, 5, 1, 6, 2, 
-	4, 0
+	3, 1, 4, 1, 5, 1, 6, 1, 
+	8, 1, 9, 2, 0, 4, 2, 5, 
+	4, 2, 7, 3
 ];
 
-static const ubyte[] _http_request_parser_key_offsets = [
+static const short[] _http_request_parser_key_offsets = [
 	0, 0, 15, 31, 44, 58, 59, 60, 
-	61, 62, 63, 65, 68, 70, 74, 91, 
-	92, 108, 115, 122, 141, 142, 143, 149, 
-	155, 167, 173, 179, 199
+	61, 62, 63, 65, 68, 70, 74, 92, 
+	93, 109, 116, 123, 143, 160, 177, 194, 
+	211, 228, 245, 262, 279, 296, 312, 334, 
+	356, 376, 377, 398, 406, 426, 427, 428, 
+	429, 435, 441, 453, 459, 465, 485
 ];
 
 static const char[] _http_request_parser_trans_keys = [
@@ -276,43 +280,85 @@ static const char[] _http_request_parser_trans_keys = [
 	95u, 126u, 36u, 46u, 48u, 59u, 64u, 90u, 
 	97u, 122u, 72u, 84u, 84u, 80u, 47u, 48u, 
 	57u, 46u, 48u, 57u, 48u, 57u, 10u, 13u, 
-	48u, 57u, 10u, 13u, 33u, 124u, 126u, 35u, 
-	39u, 42u, 43u, 45u, 46u, 48u, 57u, 65u, 
-	90u, 94u, 122u, 10u, 33u, 58u, 124u, 126u, 
+	48u, 57u, 10u, 13u, 33u, 67u, 124u, 126u, 
 	35u, 39u, 42u, 43u, 45u, 46u, 48u, 57u, 
-	65u, 90u, 94u, 122u, 10u, 13u, 127u, 0u, 
-	8u, 11u, 31u, 10u, 13u, 127u, 0u, 8u, 
-	11u, 31u, 9u, 10u, 13u, 32u, 33u, 124u, 
+	65u, 90u, 94u, 122u, 10u, 33u, 58u, 124u, 
 	126u, 35u, 39u, 42u, 43u, 45u, 46u, 48u, 
-	57u, 65u, 90u, 94u, 122u, 10u, 10u, 48u, 
-	57u, 65u, 70u, 97u, 102u, 48u, 57u, 65u, 
-	70u, 97u, 102u, 32u, 33u, 37u, 61u, 95u, 
-	126u, 36u, 59u, 63u, 90u, 97u, 122u, 48u, 
-	57u, 65u, 70u, 97u, 102u, 48u, 57u, 65u, 
-	70u, 97u, 102u, 32u, 33u, 37u, 43u, 58u, 
-	59u, 61u, 64u, 95u, 126u, 36u, 44u, 45u, 
-	46u, 48u, 57u, 65u, 90u, 97u, 122u, 0
+	57u, 65u, 90u, 94u, 122u, 10u, 13u, 127u, 
+	0u, 8u, 11u, 31u, 10u, 13u, 127u, 0u, 
+	8u, 11u, 31u, 9u, 10u, 13u, 32u, 33u, 
+	67u, 124u, 126u, 35u, 39u, 42u, 43u, 45u, 
+	46u, 48u, 57u, 65u, 90u, 94u, 122u, 33u, 
+	58u, 111u, 124u, 126u, 35u, 39u, 42u, 43u, 
+	45u, 46u, 48u, 57u, 65u, 90u, 94u, 122u, 
+	33u, 58u, 110u, 124u, 126u, 35u, 39u, 42u, 
+	43u, 45u, 46u, 48u, 57u, 65u, 90u, 94u, 
+	122u, 33u, 58u, 110u, 124u, 126u, 35u, 39u, 
+	42u, 43u, 45u, 46u, 48u, 57u, 65u, 90u, 
+	94u, 122u, 33u, 58u, 101u, 124u, 126u, 35u, 
+	39u, 42u, 43u, 45u, 46u, 48u, 57u, 65u, 
+	90u, 94u, 122u, 33u, 58u, 99u, 124u, 126u, 
+	35u, 39u, 42u, 43u, 45u, 46u, 48u, 57u, 
+	65u, 90u, 94u, 122u, 33u, 58u, 116u, 124u, 
+	126u, 35u, 39u, 42u, 43u, 45u, 46u, 48u, 
+	57u, 65u, 90u, 94u, 122u, 33u, 58u, 105u, 
+	124u, 126u, 35u, 39u, 42u, 43u, 45u, 46u, 
+	48u, 57u, 65u, 90u, 94u, 122u, 33u, 58u, 
+	111u, 124u, 126u, 35u, 39u, 42u, 43u, 45u, 
+	46u, 48u, 57u, 65u, 90u, 94u, 122u, 33u, 
+	58u, 110u, 124u, 126u, 35u, 39u, 42u, 43u, 
+	45u, 46u, 48u, 57u, 65u, 90u, 94u, 122u, 
+	33u, 58u, 124u, 126u, 35u, 39u, 42u, 43u, 
+	45u, 46u, 48u, 57u, 65u, 90u, 94u, 122u, 
+	9u, 10u, 13u, 32u, 33u, 124u, 126u, 127u, 
+	0u, 31u, 35u, 39u, 42u, 43u, 45u, 46u, 
+	48u, 57u, 65u, 90u, 94u, 122u, 9u, 10u, 
+	13u, 32u, 33u, 124u, 126u, 127u, 0u, 31u, 
+	35u, 39u, 42u, 43u, 45u, 46u, 48u, 57u, 
+	65u, 90u, 94u, 122u, 9u, 10u, 13u, 32u, 
+	33u, 67u, 124u, 126u, 35u, 39u, 42u, 43u, 
+	45u, 46u, 48u, 57u, 65u, 90u, 94u, 122u, 
+	10u, 9u, 10u, 13u, 32u, 33u, 44u, 124u, 
+	126u, 127u, 0u, 31u, 35u, 39u, 42u, 46u, 
+	48u, 57u, 65u, 90u, 94u, 122u, 9u, 10u, 
+	13u, 32u, 44u, 127u, 0u, 31u, 9u, 10u, 
+	13u, 32u, 33u, 67u, 124u, 126u, 35u, 39u, 
+	42u, 43u, 45u, 46u, 48u, 57u, 65u, 90u, 
+	94u, 122u, 10u, 10u, 10u, 48u, 57u, 65u, 
+	70u, 97u, 102u, 48u, 57u, 65u, 70u, 97u, 
+	102u, 32u, 33u, 37u, 61u, 95u, 126u, 36u, 
+	59u, 63u, 90u, 97u, 122u, 48u, 57u, 65u, 
+	70u, 97u, 102u, 48u, 57u, 65u, 70u, 97u, 
+	102u, 32u, 33u, 37u, 43u, 58u, 59u, 61u, 
+	64u, 95u, 126u, 36u, 44u, 45u, 46u, 48u, 
+	57u, 65u, 90u, 97u, 122u, 0
 ];
 
 static const byte[] _http_request_parser_single_lengths = [
 	0, 3, 4, 7, 6, 1, 1, 1, 
-	1, 1, 0, 1, 0, 2, 5, 1, 
-	4, 3, 3, 7, 1, 1, 0, 0, 
-	6, 0, 0, 10, 0
+	1, 1, 0, 1, 0, 2, 6, 1, 
+	4, 3, 3, 8, 5, 5, 5, 5, 
+	5, 5, 5, 5, 5, 4, 8, 8, 
+	8, 1, 9, 6, 8, 1, 1, 1, 
+	0, 0, 6, 0, 0, 10, 0
 ];
 
 static const byte[] _http_request_parser_range_lengths = [
 	0, 6, 6, 3, 4, 0, 0, 0, 
 	0, 0, 1, 1, 1, 1, 6, 0, 
-	6, 2, 2, 6, 0, 0, 3, 3, 
-	3, 3, 3, 5, 0
+	6, 2, 2, 6, 6, 6, 6, 6, 
+	6, 6, 6, 6, 6, 6, 7, 7, 
+	6, 0, 6, 1, 6, 0, 0, 0, 
+	3, 3, 3, 3, 3, 5, 0
 ];
 
-static const ubyte[] _http_request_parser_index_offsets = [
+static const short[] _http_request_parser_index_offsets = [
 	0, 0, 10, 21, 32, 43, 45, 47, 
-	49, 51, 53, 55, 58, 60, 64, 76, 
-	78, 89, 95, 101, 115, 117, 119, 123, 
-	127, 137, 141, 145, 161
+	49, 51, 53, 55, 58, 60, 64, 77, 
+	79, 90, 96, 102, 117, 129, 141, 153, 
+	165, 177, 189, 201, 213, 225, 236, 252, 
+	268, 283, 285, 301, 309, 324, 326, 328, 
+	330, 334, 338, 348, 352, 356, 372
 ];
 
 static const byte[] _http_request_parser_indicies = [
@@ -324,53 +370,96 @@ static const byte[] _http_request_parser_indicies = [
 	9, 9, 1, 11, 1, 12, 1, 13, 
 	1, 14, 1, 15, 1, 16, 1, 17, 
 	16, 1, 18, 1, 19, 20, 18, 1, 
-	21, 22, 23, 23, 23, 23, 23, 23, 
-	23, 23, 23, 1, 21, 1, 24, 25, 
-	24, 24, 24, 24, 24, 24, 24, 24, 
-	1, 27, 28, 1, 1, 1, 26, 30, 
-	31, 1, 1, 1, 29, 29, 32, 33, 
-	29, 34, 34, 34, 34, 34, 34, 34, 
-	34, 34, 1, 30, 1, 35, 1, 36, 
-	36, 36, 1, 9, 9, 9, 1, 8, 
-	37, 38, 37, 37, 37, 37, 37, 37, 
-	1, 39, 39, 39, 1, 37, 37, 37, 
-	1, 8, 9, 10, 40, 37, 9, 9, 
-	9, 9, 9, 9, 40, 40, 40, 40, 
-	1, 1, 0
+	21, 22, 23, 24, 23, 23, 23, 23, 
+	23, 23, 23, 23, 1, 21, 1, 25, 
+	26, 25, 25, 25, 25, 25, 25, 25, 
+	25, 1, 28, 29, 1, 1, 1, 27, 
+	31, 32, 1, 1, 1, 30, 30, 21, 
+	22, 30, 23, 24, 23, 23, 23, 23, 
+	23, 23, 23, 23, 1, 25, 26, 33, 
+	25, 25, 25, 25, 25, 25, 25, 25, 
+	1, 25, 26, 34, 25, 25, 25, 25, 
+	25, 25, 25, 25, 1, 25, 26, 35, 
+	25, 25, 25, 25, 25, 25, 25, 25, 
+	1, 25, 26, 36, 25, 25, 25, 25, 
+	25, 25, 25, 25, 1, 25, 26, 37, 
+	25, 25, 25, 25, 25, 25, 25, 25, 
+	1, 25, 26, 38, 25, 25, 25, 25, 
+	25, 25, 25, 25, 1, 25, 26, 39, 
+	25, 25, 25, 25, 25, 25, 25, 25, 
+	1, 25, 26, 40, 25, 25, 25, 25, 
+	25, 25, 25, 25, 1, 25, 26, 41, 
+	25, 25, 25, 25, 25, 25, 25, 25, 
+	1, 25, 42, 25, 25, 25, 25, 25, 
+	25, 25, 25, 1, 43, 44, 45, 43, 
+	46, 46, 46, 1, 1, 46, 46, 46, 
+	46, 46, 46, 27, 47, 48, 49, 47, 
+	46, 46, 46, 1, 1, 46, 46, 46, 
+	46, 46, 46, 30, 47, 21, 22, 47, 
+	23, 24, 23, 23, 23, 23, 23, 23, 
+	23, 23, 1, 50, 1, 51, 52, 53, 
+	51, 54, 55, 54, 54, 1, 1, 54, 
+	54, 54, 54, 54, 30, 56, 57, 58, 
+	56, 47, 1, 1, 30, 56, 21, 22, 
+	56, 23, 24, 23, 23, 23, 23, 23, 
+	23, 23, 23, 1, 59, 1, 60, 1, 
+	61, 1, 62, 62, 62, 1, 9, 9, 
+	9, 1, 8, 63, 64, 63, 63, 63, 
+	63, 63, 63, 1, 65, 65, 65, 1, 
+	63, 63, 63, 1, 8, 9, 10, 66, 
+	63, 9, 9, 9, 9, 9, 9, 66, 
+	66, 66, 66, 1, 1, 0
 ];
 
 static const byte[] _http_request_parser_trans_targs = [
-	2, 0, 3, 2, 4, 22, 24, 27, 
-	5, 4, 22, 6, 7, 8, 9, 10, 
-	11, 12, 13, 14, 21, 28, 15, 16, 
-	16, 17, 18, 19, 20, 18, 19, 20, 
-	28, 15, 16, 14, 23, 24, 25, 26, 
-	27
+	2, 0, 3, 2, 4, 40, 42, 45, 
+	5, 4, 40, 6, 7, 8, 9, 10, 
+	11, 12, 13, 14, 39, 46, 15, 16, 
+	20, 16, 17, 18, 19, 38, 18, 19, 
+	38, 21, 22, 23, 24, 25, 26, 27, 
+	28, 29, 30, 31, 32, 33, 34, 31, 
+	32, 33, 32, 35, 36, 37, 34, 31, 
+	35, 36, 37, 36, 19, 14, 41, 42, 
+	43, 44, 45
 ];
 
 static const byte[] _http_request_parser_trans_actions = [
-	1, 0, 11, 0, 1, 1, 1, 1, 
-	13, 0, 0, 1, 0, 0, 0, 0, 
+	1, 0, 15, 0, 1, 1, 1, 1, 
+	17, 0, 0, 1, 0, 0, 0, 0, 
 	0, 0, 0, 5, 5, 0, 0, 1, 
-	0, 7, 1, 1, 1, 0, 0, 0, 
-	9, 9, 15, 0, 0, 0, 0, 0, 
-	0
+	1, 0, 7, 1, 19, 19, 0, 9, 
+	9, 0, 0, 0, 0, 0, 0, 0, 
+	0, 0, 25, 1, 19, 19, 1, 0, 
+	9, 9, 0, 11, 22, 22, 0, 11, 
+	0, 9, 9, 0, 0, 0, 0, 0, 
+	0, 0, 0
 ];
 
 static const byte[] _http_request_parser_from_state_actions = [
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 3
+	0, 0, 0, 0, 0, 0, 0, 0, 
+	0, 0, 0, 0, 0, 0, 0, 0, 
+	0, 0, 0, 0, 0, 0, 3
+];
+
+static const byte[] _http_request_parser_eof_actions = [
+	0, 0, 0, 0, 0, 0, 0, 0, 
+	0, 0, 0, 0, 0, 0, 0, 0, 
+	0, 0, 0, 0, 0, 0, 0, 0, 
+	0, 0, 0, 0, 0, 0, 0, 0, 
+	0, 0, 13, 0, 0, 0, 0, 0, 
+	0, 0, 0, 0, 0, 0, 0
 ];
 
 static const int http_request_parser_start = 1;
-static const int http_request_parser_first_final = 28;
+static const int http_request_parser_first_final = 46;
 static const int http_request_parser_error = 0;
 
 static const int http_request_parser_en_main = 1;
 
-#line 168 "parser.rl"
+#line 169 "parser.rl"
 
 
 public:
@@ -378,11 +467,11 @@ public:
     {
         super.init();
         
-#line 382 "parser.d"
+#line 471 "parser.d"
 	{
 	cs = http_request_parser_start;
 	}
-#line 175 "parser.rl"
+#line 176 "parser.rl"
     }
 
 protected:
@@ -391,7 +480,7 @@ protected:
         with(_request.requestLine) {
             with(*_request) {
                 
-#line 395 "parser.d"
+#line 484 "parser.d"
 	{
 	int _klen;
 	uint _trans;
@@ -412,7 +501,7 @@ _resume:
 #line 6 "parser.rl"
 	{ {p++; if (true) goto _out; } }
 	break;
-#line 416 "parser.d"
+#line 505 "parser.d"
 		default: break;
 		}
 	}
@@ -500,29 +589,50 @@ _match:
 	case 4:
 #line 69 "parser.rl"
 	{
-        char[] fieldValue = mark[0..p - mark];
-        unfold(fieldValue);
-        this[_fieldName] = fieldValue;
-        //    fgoto *http_request_parser_error;
-        mark = null;
+        if (_headerHandled) {
+            _headerHandled = false;
+        } else {
+            char[] fieldValue = mark[0..p - mark];
+            unfold(fieldValue);
+            this[_fieldName] = fieldValue;
+            //    fgoto *http_request_parser_error;
+            mark = null;
+        }
     }
 	break;
 	case 5:
-#line 150 "parser.rl"
+#line 86 "parser.rl"
+	{
+        _list.insert(mark[0..p-mark]);
+        mark = null;
+    }
+	break;
+	case 7:
+#line 97 "parser.rl"
+	{
+        if (general.connection is null) {
+            general.connection = new RedBlackTree!(string)();
+        }
+        _headerHandled = true;
+        _list = general.connection;
+    }
+	break;
+	case 8:
+#line 151 "parser.rl"
 	{
             requestLine.method =
                 parseHttpMethod(mark[0..p - mark]);
             mark = null;
         }
 	break;
-	case 6:
-#line 156 "parser.rl"
+	case 9:
+#line 157 "parser.rl"
 	{
             requestLine.uri = mark[0..p - mark];
             mark = null;
         }
 	break;
-#line 526 "parser.d"
+#line 636 "parser.d"
 		default: break;
 		}
 	}
@@ -533,9 +643,28 @@ _again:
 	if ( ++p != pe )
 		goto _resume;
 	_test_eof: {}
+	if ( p == eof )
+	{
+	byte* __acts = &_http_request_parser_actions[_http_request_parser_eof_actions[cs]];
+	uint __nacts = cast(uint) *__acts++;
+	while ( __nacts-- > 0 ) {
+		switch ( *__acts++ ) {
+	case 6:
+#line 90 "parser.rl"
+	{
+        _list.insert(mark[0..pe-mark]);
+        mark = null;
+    }
+	break;
+#line 660 "parser.d"
+		default: break;
+		}
+	}
+	}
+
 	_out: {}
 	}
-#line 183 "parser.rl"
+#line 184 "parser.rl"
             }
         }
     }
@@ -558,7 +687,9 @@ private:
     }
     
     Request* _request;
+    bool _headerHandled;
     string _fieldName;
+    IStringSet _list;    
     static Logger _log;
 }
 
@@ -570,18 +701,21 @@ class ResponseParser : RagelParser
     }
 private:
     
-#line 574 "parser.d"
+#line 705 "parser.d"
 static const byte[] _http_response_parser_actions = [
 	0, 1, 0, 1, 1, 1, 2, 1, 
-	3, 1, 4, 1, 5, 1, 6, 2, 
-	0, 6, 2, 4, 0
+	3, 1, 4, 1, 5, 1, 6, 1, 
+	8, 1, 9, 2, 0, 4, 2, 0, 
+	9, 2, 5, 4, 2, 7, 3
 ];
 
-static const byte[] _http_response_parser_key_offsets = [
+static const short[] _http_response_parser_key_offsets = [
 	0, 0, 1, 2, 3, 4, 5, 7, 
 	10, 12, 15, 17, 19, 21, 22, 29, 
-	36, 53, 54, 70, 77, 84, 103, 104, 
-	105
+	36, 54, 55, 71, 78, 85, 105, 122, 
+	139, 156, 173, 190, 207, 224, 241, 258, 
+	274, 296, 318, 338, 339, 360, 368, 388, 
+	389, 390, 391
 ];
 
 static const char[] _http_response_parser_trans_keys = [
@@ -589,37 +723,78 @@ static const char[] _http_response_parser_trans_keys = [
 	48u, 57u, 48u, 57u, 32u, 48u, 57u, 48u, 
 	57u, 48u, 57u, 48u, 57u, 32u, 10u, 13u, 
 	127u, 0u, 8u, 11u, 31u, 10u, 13u, 127u, 
-	0u, 8u, 11u, 31u, 10u, 13u, 33u, 124u, 
-	126u, 35u, 39u, 42u, 43u, 45u, 46u, 48u, 
-	57u, 65u, 90u, 94u, 122u, 10u, 33u, 58u, 
+	0u, 8u, 11u, 31u, 10u, 13u, 33u, 67u, 
 	124u, 126u, 35u, 39u, 42u, 43u, 45u, 46u, 
-	48u, 57u, 65u, 90u, 94u, 122u, 10u, 13u, 
-	127u, 0u, 8u, 11u, 31u, 10u, 13u, 127u, 
-	0u, 8u, 11u, 31u, 9u, 10u, 13u, 32u, 
-	33u, 124u, 126u, 35u, 39u, 42u, 43u, 45u, 
+	48u, 57u, 65u, 90u, 94u, 122u, 10u, 33u, 
+	58u, 124u, 126u, 35u, 39u, 42u, 43u, 45u, 
 	46u, 48u, 57u, 65u, 90u, 94u, 122u, 10u, 
-	10u, 0
+	13u, 127u, 0u, 8u, 11u, 31u, 10u, 13u, 
+	127u, 0u, 8u, 11u, 31u, 9u, 10u, 13u, 
+	32u, 33u, 67u, 124u, 126u, 35u, 39u, 42u, 
+	43u, 45u, 46u, 48u, 57u, 65u, 90u, 94u, 
+	122u, 33u, 58u, 111u, 124u, 126u, 35u, 39u, 
+	42u, 43u, 45u, 46u, 48u, 57u, 65u, 90u, 
+	94u, 122u, 33u, 58u, 110u, 124u, 126u, 35u, 
+	39u, 42u, 43u, 45u, 46u, 48u, 57u, 65u, 
+	90u, 94u, 122u, 33u, 58u, 110u, 124u, 126u, 
+	35u, 39u, 42u, 43u, 45u, 46u, 48u, 57u, 
+	65u, 90u, 94u, 122u, 33u, 58u, 101u, 124u, 
+	126u, 35u, 39u, 42u, 43u, 45u, 46u, 48u, 
+	57u, 65u, 90u, 94u, 122u, 33u, 58u, 99u, 
+	124u, 126u, 35u, 39u, 42u, 43u, 45u, 46u, 
+	48u, 57u, 65u, 90u, 94u, 122u, 33u, 58u, 
+	116u, 124u, 126u, 35u, 39u, 42u, 43u, 45u, 
+	46u, 48u, 57u, 65u, 90u, 94u, 122u, 33u, 
+	58u, 105u, 124u, 126u, 35u, 39u, 42u, 43u, 
+	45u, 46u, 48u, 57u, 65u, 90u, 94u, 122u, 
+	33u, 58u, 111u, 124u, 126u, 35u, 39u, 42u, 
+	43u, 45u, 46u, 48u, 57u, 65u, 90u, 94u, 
+	122u, 33u, 58u, 110u, 124u, 126u, 35u, 39u, 
+	42u, 43u, 45u, 46u, 48u, 57u, 65u, 90u, 
+	94u, 122u, 33u, 58u, 124u, 126u, 35u, 39u, 
+	42u, 43u, 45u, 46u, 48u, 57u, 65u, 90u, 
+	94u, 122u, 9u, 10u, 13u, 32u, 33u, 124u, 
+	126u, 127u, 0u, 31u, 35u, 39u, 42u, 43u, 
+	45u, 46u, 48u, 57u, 65u, 90u, 94u, 122u, 
+	9u, 10u, 13u, 32u, 33u, 124u, 126u, 127u, 
+	0u, 31u, 35u, 39u, 42u, 43u, 45u, 46u, 
+	48u, 57u, 65u, 90u, 94u, 122u, 9u, 10u, 
+	13u, 32u, 33u, 67u, 124u, 126u, 35u, 39u, 
+	42u, 43u, 45u, 46u, 48u, 57u, 65u, 90u, 
+	94u, 122u, 10u, 9u, 10u, 13u, 32u, 33u, 
+	44u, 124u, 126u, 127u, 0u, 31u, 35u, 39u, 
+	42u, 46u, 48u, 57u, 65u, 90u, 94u, 122u, 
+	9u, 10u, 13u, 32u, 44u, 127u, 0u, 31u, 
+	9u, 10u, 13u, 32u, 33u, 67u, 124u, 126u, 
+	35u, 39u, 42u, 43u, 45u, 46u, 48u, 57u, 
+	65u, 90u, 94u, 122u, 10u, 10u, 10u, 0
 ];
 
 static const byte[] _http_response_parser_single_lengths = [
 	0, 1, 1, 1, 1, 1, 0, 1, 
 	0, 1, 0, 0, 0, 1, 3, 3, 
-	5, 1, 4, 3, 3, 7, 1, 1, 
-	0
+	6, 1, 4, 3, 3, 8, 5, 5, 
+	5, 5, 5, 5, 5, 5, 5, 4, 
+	8, 8, 8, 1, 9, 6, 8, 1, 
+	1, 1, 0
 ];
 
 static const byte[] _http_response_parser_range_lengths = [
 	0, 0, 0, 0, 0, 0, 1, 1, 
 	1, 1, 1, 1, 1, 0, 2, 2, 
-	6, 0, 6, 2, 2, 6, 0, 0, 
-	0
+	6, 0, 6, 2, 2, 6, 6, 6, 
+	6, 6, 6, 6, 6, 6, 6, 6, 
+	7, 7, 6, 0, 6, 1, 6, 0, 
+	0, 0, 0
 ];
 
-static const byte[] _http_response_parser_index_offsets = [
+static const short[] _http_response_parser_index_offsets = [
 	0, 0, 2, 4, 6, 8, 10, 12, 
 	15, 17, 20, 22, 24, 26, 28, 34, 
-	40, 52, 54, 65, 71, 77, 91, 93, 
-	95
+	40, 53, 55, 66, 72, 78, 93, 105, 
+	117, 129, 141, 153, 165, 177, 189, 201, 
+	212, 228, 244, 259, 261, 277, 285, 300, 
+	302, 304, 306
 ];
 
 static const byte[] _http_response_parser_indicies = [
@@ -628,46 +803,89 @@ static const byte[] _http_response_parser_indicies = [
 	1, 9, 8, 1, 10, 1, 11, 1, 
 	12, 1, 13, 1, 15, 16, 1, 1, 
 	1, 14, 18, 19, 1, 1, 1, 17, 
-	20, 21, 22, 22, 22, 22, 22, 22, 
-	22, 22, 22, 1, 20, 1, 23, 24, 
-	23, 23, 23, 23, 23, 23, 23, 23, 
-	1, 26, 27, 1, 1, 1, 25, 29, 
-	30, 1, 1, 1, 28, 28, 31, 32, 
-	28, 33, 33, 33, 33, 33, 33, 33, 
-	33, 33, 1, 29, 1, 34, 1, 1, 
-	0
+	20, 21, 22, 23, 22, 22, 22, 22, 
+	22, 22, 22, 22, 1, 20, 1, 24, 
+	25, 24, 24, 24, 24, 24, 24, 24, 
+	24, 1, 27, 28, 1, 1, 1, 26, 
+	30, 31, 1, 1, 1, 29, 29, 20, 
+	21, 29, 22, 23, 22, 22, 22, 22, 
+	22, 22, 22, 22, 1, 24, 25, 32, 
+	24, 24, 24, 24, 24, 24, 24, 24, 
+	1, 24, 25, 33, 24, 24, 24, 24, 
+	24, 24, 24, 24, 1, 24, 25, 34, 
+	24, 24, 24, 24, 24, 24, 24, 24, 
+	1, 24, 25, 35, 24, 24, 24, 24, 
+	24, 24, 24, 24, 1, 24, 25, 36, 
+	24, 24, 24, 24, 24, 24, 24, 24, 
+	1, 24, 25, 37, 24, 24, 24, 24, 
+	24, 24, 24, 24, 1, 24, 25, 38, 
+	24, 24, 24, 24, 24, 24, 24, 24, 
+	1, 24, 25, 39, 24, 24, 24, 24, 
+	24, 24, 24, 24, 1, 24, 25, 40, 
+	24, 24, 24, 24, 24, 24, 24, 24, 
+	1, 24, 41, 24, 24, 24, 24, 24, 
+	24, 24, 24, 1, 42, 43, 44, 42, 
+	45, 45, 45, 1, 1, 45, 45, 45, 
+	45, 45, 45, 26, 46, 47, 48, 46, 
+	45, 45, 45, 1, 1, 45, 45, 45, 
+	45, 45, 45, 29, 46, 20, 21, 46, 
+	22, 23, 22, 22, 22, 22, 22, 22, 
+	22, 22, 1, 49, 1, 50, 51, 52, 
+	50, 53, 54, 53, 53, 1, 1, 53, 
+	53, 53, 53, 53, 29, 55, 56, 57, 
+	55, 46, 1, 1, 29, 55, 20, 21, 
+	55, 22, 23, 22, 22, 22, 22, 22, 
+	22, 22, 22, 1, 58, 1, 59, 1, 
+	60, 1, 1, 0
 ];
 
 static const byte[] _http_response_parser_trans_targs = [
 	2, 0, 3, 4, 5, 6, 7, 8, 
 	9, 10, 11, 12, 13, 14, 15, 16, 
-	23, 15, 16, 23, 24, 17, 18, 18, 
-	19, 20, 21, 22, 20, 21, 22, 24, 
-	17, 18, 16
+	41, 15, 16, 41, 42, 17, 18, 22, 
+	18, 19, 20, 21, 40, 20, 21, 40, 
+	23, 24, 25, 26, 27, 28, 29, 30, 
+	31, 32, 33, 34, 35, 36, 33, 34, 
+	35, 34, 37, 38, 39, 36, 33, 37, 
+	38, 39, 38, 21, 16
 ];
 
 static const byte[] _http_response_parser_trans_actions = [
 	1, 0, 0, 0, 0, 0, 0, 0, 
-	0, 5, 1, 0, 0, 11, 1, 15, 
-	15, 0, 13, 13, 0, 0, 1, 0, 
-	7, 1, 1, 1, 0, 0, 0, 9, 
-	9, 18, 0
+	0, 5, 1, 0, 0, 15, 1, 22, 
+	22, 0, 17, 17, 0, 0, 1, 1, 
+	0, 7, 1, 19, 19, 0, 9, 9, 
+	0, 0, 0, 0, 0, 0, 0, 0, 
+	0, 28, 1, 19, 19, 1, 0, 9, 
+	9, 0, 11, 25, 25, 0, 11, 0, 
+	9, 9, 0, 0, 0
 ];
 
 static const byte[] _http_response_parser_from_state_actions = [
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
-	3
+	0, 0, 0, 0, 0, 0, 0, 0, 
+	0, 0, 0, 0, 0, 0, 0, 0, 
+	0, 0, 3
+];
+
+static const byte[] _http_response_parser_eof_actions = [
+	0, 0, 0, 0, 0, 0, 0, 0, 
+	0, 0, 0, 0, 0, 0, 0, 0, 
+	0, 0, 0, 0, 0, 0, 0, 0, 
+	0, 0, 0, 0, 0, 0, 0, 0, 
+	0, 0, 0, 0, 13, 0, 0, 0, 
+	0, 0, 0
 ];
 
 static const int http_response_parser_start = 1;
-static const int http_response_parser_first_final = 24;
+static const int http_response_parser_first_final = 42;
 static const int http_response_parser_error = 0;
 
 static const int http_response_parser_en_main = 1;
 
-#line 237 "parser.rl"
+#line 240 "parser.rl"
 
 
 public:
@@ -675,11 +893,11 @@ public:
     {
         super.init();
         
-#line 679 "parser.d"
+#line 897 "parser.d"
 	{
 	cs = http_response_parser_start;
 	}
-#line 244 "parser.rl"
+#line 247 "parser.rl"
     }
 
 protected:
@@ -688,7 +906,7 @@ protected:
         with(_response.status) {
             with(*_response) {
                 
-#line 692 "parser.d"
+#line 910 "parser.d"
 	{
 	int _klen;
 	uint _trans;
@@ -709,7 +927,7 @@ _resume:
 #line 6 "parser.rl"
 	{ {p++; if (true) goto _out; } }
 	break;
-#line 713 "parser.d"
+#line 931 "parser.d"
 		default: break;
 		}
 	}
@@ -797,28 +1015,49 @@ _match:
 	case 4:
 #line 69 "parser.rl"
 	{
-        char[] fieldValue = mark[0..p - mark];
-        unfold(fieldValue);
-        this[_fieldName] = fieldValue;
-        //    fgoto *http_request_parser_error;
-        mark = null;
+        if (_headerHandled) {
+            _headerHandled = false;
+        } else {
+            char[] fieldValue = mark[0..p - mark];
+            unfold(fieldValue);
+            this[_fieldName] = fieldValue;
+            //    fgoto *http_request_parser_error;
+            mark = null;
+        }
     }
 	break;
 	case 5:
-#line 220 "parser.rl"
+#line 86 "parser.rl"
+	{
+        _list.insert(mark[0..p-mark]);
+        mark = null;
+    }
+	break;
+	case 7:
+#line 97 "parser.rl"
+	{
+        if (general.connection is null) {
+            general.connection = new RedBlackTree!(string)();
+        }
+        _headerHandled = true;
+        _list = general.connection;
+    }
+	break;
+	case 8:
+#line 223 "parser.rl"
 	{
             status.status = cast(Status)to!(int)(mark[0..p - mark]);
             mark = null;
         }
 	break;
-	case 6:
-#line 225 "parser.rl"
+	case 9:
+#line 228 "parser.rl"
 	{
             status.reason = mark[0..p - mark];
             mark = null;
         }
 	break;
-#line 822 "parser.d"
+#line 1061 "parser.d"
 		default: break;
 		}
 	}
@@ -829,9 +1068,28 @@ _again:
 	if ( ++p != pe )
 		goto _resume;
 	_test_eof: {}
+	if ( p == eof )
+	{
+	byte* __acts = &_http_response_parser_actions[_http_response_parser_eof_actions[cs]];
+	uint __nacts = cast(uint) *__acts++;
+	while ( __nacts-- > 0 ) {
+		switch ( *__acts++ ) {
+	case 6:
+#line 90 "parser.rl"
+	{
+        _list.insert(mark[0..pe-mark]);
+        mark = null;
+    }
+	break;
+#line 1085 "parser.d"
+		default: break;
+		}
+	}
+	}
+
 	_out: {}
 	}
-#line 252 "parser.rl"
+#line 255 "parser.rl"
             }
         }
     }
@@ -859,6 +1117,8 @@ private:
     }
     
     Response* _response;
+    bool _headerHandled;
     string _fieldName;
+    IStringSet _list;    
     static Logger _log;
 }

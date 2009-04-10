@@ -67,16 +67,43 @@
         mark = null;
     }
     action parse_field_value {
-        char[] fieldValue = mark[0..fpc - mark];
-        unfold(fieldValue);
-        this[_fieldName] = fieldValue;
-        //    fgoto *http_request_parser_error;
-        mark = null;
+        if (_headerHandled) {
+            _headerHandled = false;
+        } else {
+            char[] fieldValue = mark[0..fpc - mark];
+            unfold(fieldValue);
+            this[_fieldName] = fieldValue;
+            //    fgoto *http_request_parser_error;
+            mark = null;
+        }
     }
 
     field_chars = OCTET -- (CTL | CR LF SP HT);
     field_name = token >mark %parse_field_name;
-    field_value = (TEXT* CRLF) >mark %parse_field_value;
+    field_value = TEXT* >mark %parse_field_value;
     message_header = field_name ":" field_value;
+    
+    action save_element {
+        _list.insert(mark[0..fpc-mark]);
+        mark = null;
+    }
+    action save_element_eof {
+        _list.insert(mark[0..pe-mark]);
+        mark = null;
+    }
+    element = token >mark %save_element %/save_element_eof;
+    list = LWS* element ( LWS* ',' LWS* element)* LWS*;
+    
+    action set_connection_list {
+        if (general.connection is null) {
+            general.connection = new RedBlackTree!(string)();
+        }
+        _headerHandled = true;
+        _list = general.connection;
+    }
+
+    Connection = 'Connection:' @set_connection_list . list;
+    
+    general_header = Connection;
 
 }%%

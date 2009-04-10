@@ -18,13 +18,13 @@ class RagelParser
         init();
         p = str.ptr;
         pe = p + str.length;
+        pe = eof;
 
         exec();
 
         if (error) {
             return;
         }
-        eof();
         if (p == pe) {
             return;
         } else {
@@ -63,12 +63,13 @@ class RagelParser
         p = fullString.ptr;
         pe = p + fullString.length;
         p = pe - buffer.length;
+        if (isEof) {
+            eof = pe;
+        } else {
+            eof = null;
+        }
 
         exec();
-
-        if (!error && isEof) {
-            eof();
-        }
 
         if (mark is null) {
             fullString.length = 0;
@@ -86,11 +87,10 @@ class RagelParser
     
 protected:
     abstract void exec();
-    void eof() {};
     
 protected:
     // Ragel state
     int cs;
-    char* p, pe, mark;
+    char* p, pe, eof, mark;
     char[] fullString;
 }

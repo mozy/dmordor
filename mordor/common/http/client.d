@@ -48,10 +48,14 @@ class Connection
     in
     {
         with (requestHeaders) {
+            // 1.0, 1.1, or defaulted
             assert(requestLine.ver == Version.init ||
                    requestLine.ver == Version(1, 0) ||
                    requestLine.ver == Version(1, 1));
+            // Have to request something
             assert(requestLine.uri.length > 0);
+            // Host header required with HTTP/1.1
+            assert(request.host.length > 0 || requestLine.ver != Version(1, 1));
         }
     }
     body
