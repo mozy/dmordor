@@ -44,7 +44,7 @@ class Connection
         _getStream.allowPartialReads = true;
     }
     
-    void request(Request requestHeaders, void delegate(Stream) request,
+    void request(Request requestHeaders, void delegate(Stream) requestDg,
                  void delegate(Response, Stream) response)
     in
     {
@@ -57,6 +57,13 @@ class Connection
             assert(requestLine.uri.length > 0);
             // Host header required with HTTP/1.1
             assert(request.host.length > 0 || requestLine.ver != Version(1, 1));
+            // TODO: a request message is also present if Transfer-Encoding or
+            // Content-Type are specified.
+            if (entity.contentLength > 0 && entity.contentLength != ~0)
+                assert(requestDg !is null);
+            if (entity.contentLength == 0)
+                assert(requestDg is null);
+            // TODO: assert(contentLength == ~0 if Transfer-Encoding is not empty);
         }
     }
     body
@@ -103,7 +110,6 @@ class Connection
             synchronized (_pendingResponses) if (_responseException !is null)
                 throw _responseException;
 
-            Stream requestStream;
             with (requestHeaders) {
                 // Default HTTP version... 1.1 if possible
                 if (requestLine.ver == Version.init) {
@@ -138,9 +144,17 @@ class Connection
             string requestHeadersString = requestHeaders.toString();
             _log.trace("Sending request {}", requestHeadersString);
             _stream.write(requestHeadersString);
-            // TODO: write request headers
-            if (requestStream !is null)
-                request(requestStream);
+            if (requestDg !is null) {
+                Stream requestStream = new SingleplexStream(_stream, SingleplexStream.Type.WRITE, false);
+                with (requestHeaders) {
+                    if (entity.contentLength != ~0) {
+                        requestStream = new LimitedStream(requestStream, entity.contentLength);
+                    } else {
+                        // TODO: chunked encoding, unless Content-Type is multipart
+                    }
+                }
+                requestDg(requestStream);
+            }
             
             synchronized (_pendingRequests) {
                 auto it = _pendingRequests.begin;
@@ -236,7 +250,7 @@ class Connection
                     requestHeaders.requestLine.method == Method.HEAD) {
                     // no entity
                 } else {
-                    responseStream = new SingleplexStream(_stream, SingleplexStream.Type.READ, false);
+                    responseStream = _getStream;
                     // TODO: transfer encoding
                     if (entity.contentLength != ~0) {
                         responseStream = new LimitedStream(responseStream, entity.contentLength);
