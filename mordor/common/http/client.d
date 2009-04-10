@@ -9,6 +9,7 @@ import mordor.common.http.parser;
 import mordor.common.scheduler;
 import mordor.common.streams.buffered;
 import mordor.common.streams.duplex;
+import mordor.common.streams.limited;
 import mordor.common.streams.singleplex;
 import mordor.common.streams.singleplexer;
 import mordor.common.streams.stream;
@@ -191,7 +192,7 @@ class Connection
             }
             
             Response responseHeaders;
-            Stream responseStream = _stream;
+            Stream responseStream;
             // Read and parse headers
             scope parser = new ResponseParser(responseHeaders);
             parser.init();
@@ -228,6 +229,23 @@ class Connection
                         close = true;
                 } else {
                     throw new Exception("Unrecognized HTTP server version.");
+                }
+                if (cast(int)status.status >= 100 && cast(int)status.status <= 199 ||
+                    cast(int)status.status == 204 ||
+                    cast(int)status.status == 304 ||
+                    requestHeaders.requestLine.method == Method.HEAD) {
+                    // no entity
+                } else {
+                    responseStream = new SingleplexStream(_stream, SingleplexStream.Type.READ, false);
+                    // TODO: transfer encoding
+                    if (entity.contentLength != ~0) {
+                        responseStream = new LimitedStream(responseStream, entity.contentLength);
+                    } else {
+                        if (!close) {
+                            _log.warn("Server indicated persistent connection, but has no way to delimit the message; closing");
+                            close = true;
+                        }
+                    }
                 }
             }
             response(responseHeaders, responseStream);
