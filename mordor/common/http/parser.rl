@@ -219,6 +219,7 @@ private:
     %%{
         machine http_response_parser;
         include http_parser "basics.rl";
+        include uri_parser "uri_parser.rl";
         
         action parse_Status_Code {
             status.status = cast(Status)to!(int)(mark[0..fpc - mark]);
@@ -230,10 +231,24 @@ private:
             mark = null;
         }
         
+        action set_location {
+            _headerHandled = true;
+            _string = &response.location;
+        }
+        
+        action save_string {
+            *_string = mark[0..fpc - mark];
+            mark = null;
+        }
+        
+        Location = 'Location:' @set_location LWS* absoluteURI >mark %save_string LWS*;
+        
+        response_header = Location;
+
         Status_Code = DIGIT{3} > mark %parse_Status_Code;
         Reason_Phrase = (TEXT -- (CR | LF))* >mark %parse_Reason_Phrase;
         Status_Line = HTTP_Version SP Status_Code SP Reason_Phrase CRLF;
-        Response = Status_Line ((general_header | message_header) CRLF)* CRLF %*done;
+        Response = Status_Line ((general_header | response_header | message_header) CRLF)* CRLF %*done;
     
         main := Response;
         write data;
@@ -281,6 +296,7 @@ private:
     Response* _response;
     bool _headerHandled;
     string _fieldName;
-    IStringSet _list;    
+    IStringSet _list;
+    string* _string;
     static Logger _log;
 }

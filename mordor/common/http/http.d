@@ -163,9 +163,14 @@ struct RequestHeaders
 
 struct ResponseHeaders
 {
+    string location;
+
     string toString()
     {
-        return "";
+        string ret;
+        if (location.length > 0)
+            ret ~= "Location: " ~ location ~ "\r\n";
+        return ret;
     }
 }
 
