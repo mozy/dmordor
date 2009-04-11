@@ -63,7 +63,7 @@
     range_unit = bytes_unit | other_range_unit;
 
     action save_field_name {
-        _fieldName = mark[0..fpc - mark];
+        _temp1 = mark[0..fpc - mark];
         mark = null;
     }
     action save_field_value {
@@ -72,9 +72,9 @@
         } else {
             char[] fieldValue = mark[0..fpc - mark];
             unfold(fieldValue);
-            string* value = _fieldName in entity.extension;
+            string* value = _temp1 in entity.extension;
             if (value is null) {
-                entity.extension[_fieldName] = fieldValue;
+                entity.extension[_temp1] = fieldValue;
             } else {
                 *value ~= ", " ~ fieldValue;
             }
@@ -108,24 +108,52 @@
     element = token >mark %save_element %/save_element_eof;
     list = LWS* element ( LWS* ',' LWS* element)* LWS*;
     
-    action set_connection_list {
+    action save_parameterized_list_element {
+        _parameterizedList.length = _parameterizedList.length + 1;
+        (*_parameterizedList)[$-1].value = mark[0..fpc - mark];
+        mark = null;
+    }
+    
+    action save_parameterized_list_attribute {
+        _temp1 = mark[0..fpc - mark];
+        mark = null;
+    }
+    
+    action save_parameterized_list_value {
+        (*_parameterizedList)[$-1].parameters[_temp1] = mark[0..fpc - mark];
+        mark = null;
+    }
+    
+    attribute = token;
+    value = token | quoted_string;
+    parameter = attribute >mark %save_parameterized_list_attribute '=' value >mark %save_parameterized_list_value;
+    parameterizedListElement = token >mark %save_parameterized_list_element (';' parameter)*;
+    parameterizedList = LWS* parameterizedListElement ( LWS* ',' LWS* parameterizedListElement)* LWS*;
+    
+    action set_connection {
         if (general.connection is null) {
-            general.connection = new IStringSet();
+            general.connection = new StringSet();
         }
         _headerHandled = true;
         _list = general.connection;
     }
-
-    Connection = 'Connection:' @set_connection_list . list;
     
-    general_header = Connection;
+    action set_transfer_encoding {
+        _headerHandled = true;
+        _parameterizedList = &general.transferEncoding;
+    }
+
+    Connection = 'Connection:' @set_connection list;
+    Transfer_Encoding = 'Transfer-Encoding:' @set_transfer_encoding parameterizedList;
+    
+    general_header = Connection | Transfer_Encoding;
     
     action set_content_length {
         _headerHandled = true;
         _ulong = &entity.contentLength;
     }
     
-    Content_Length = 'Content-Length:' @set_content_length . LWS* . DIGIT+ >mark %save_ulong LWS*;
+    Content_Length = 'Content-Length:' @set_content_length LWS* DIGIT+ >mark %save_ulong LWS*;
     
     extension_header = message_header;
 

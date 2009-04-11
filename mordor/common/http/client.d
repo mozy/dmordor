@@ -4,8 +4,7 @@ import tango.core.Thread;
 import tango.util.log.Log;
 
 import mordor.common.containers.linkedlist;
-public import mordor.common.http.http;
-import mordor.common.http.parser;
+public import mordor.common.http.parser;
 import mordor.common.scheduler;
 import mordor.common.streams.buffered;
 import mordor.common.streams.duplex;
@@ -121,7 +120,7 @@ class Connection
                 // If not specified, try to keep the connection open
                 if (general.connection is null) {
                     if (requestLine.ver == Version(1, 0)) {
-                        general.connection = new IStringSet();
+                        general.connection = new StringSet();
                         general.connection.insert("Keep-Alive");
                     }
                 }

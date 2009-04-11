@@ -75,8 +75,3 @@ bool isHexString(string str)
     }
     return true;
 }
-
-alias RedBlackTree!(string) StringSet;
-// TODO: really case insensitive
-alias StringSet IStringSet;
-
