@@ -133,16 +133,19 @@ public:
         static if(includeSize) ++_size;
     }
 
-    void erase(Iterator it) 
+    Iterator erase(Iterator it) 
     in
     {
         assert(it != end);
     }
     body
     {
+        Iterator result = it;
+        ++result;
         it._node._prev._next = it._node._next;
         it._node._next._prev = it._node._prev;
         static if(includeSize) --_size;
+        return result;
     }
     
     void erase(Iterator start, Iterator stop)
