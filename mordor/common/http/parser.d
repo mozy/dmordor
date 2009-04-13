@@ -282,6 +282,25 @@ unittest
     assert(request.toString() == "GET / HTTP/1.1\r\nConnection: close\r\n\r\n", request.toString());
 }
 
+unittest
+{
+    string request = "GET / HTTP/1.0\r\n"
+        "Transfer-Encoding: chunked\r\n"
+        "\r\n";
+    Request headers;
+    
+    auto parser = new RequestParser(headers);
+    
+    parser.run(request);
+    with (headers) {
+        assert(requestLine.method = Method.GET);
+        assert(requestLine.ver = Version(1, 0));
+        assert(general.transferEncoding.length == 1);
+        assert(general.transferEncoding[0].value == "chunked");
+        assert(general.transferEncoding[0].parameters.length == 0);
+    }
+}
+
 void
 unfold(ref char[] ps)
 {
@@ -352,7 +371,7 @@ package class NeedQuote : RagelParser
 {
 private:
 
-#line 356 "parser.d"
+#line 375 "parser.d"
 static const byte[] _need_quote_key_offsets = [
 	0, 0, 15
 ];
@@ -388,17 +407,17 @@ static const int need_quote_error = 0;
 
 static const int need_quote_en_main = 1;
 
-#line 358 "parser.rl"
+#line 377 "parser.rl"
 
 public:
     void init() {
         super.init();
         
-#line 398 "parser.d"
+#line 417 "parser.d"
 	{
 	cs = need_quote_start;
 	}
-#line 363 "parser.rl"
+#line 382 "parser.rl"
     }
     bool complete() {
         return cs >= need_quote_first_final;
@@ -409,7 +428,7 @@ public:
 protected:
     void exec() {
         
-#line 413 "parser.d"
+#line 432 "parser.d"
 	{
 	int _klen;
 	uint _trans;
@@ -478,7 +497,7 @@ _match:
 	_test_eof: {}
 	_out: {}
 	}
-#line 373 "parser.rl"
+#line 392 "parser.rl"
     }
 };
 
@@ -520,7 +539,7 @@ class RequestParser : RagelParser
     }
 private:
     
-#line 524 "parser.d"
+#line 543 "parser.d"
 static const byte[] _http_request_parser_actions = [
 	0, 1, 0, 1, 1, 1, 2, 1, 
 	3, 1, 4, 1, 5, 1, 6, 1, 
@@ -1498,12 +1517,12 @@ static const byte[] _http_request_parser_trans_actions = [
 	0, 0, 0, 1, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 5, 5, 0, 0, 
-	0, 0, 1, 1, 1, 1, 1, 1, 
-	1, 1, 1, 1, 1, 1, 0, 0, 
+	3, 0, 1, 1, 1, 1, 1, 1, 
+	1, 1, 1, 1, 1, 1, 0, 3, 
 	0, 0, 7, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 29, 29, 0, 0, 
 	0, 1, 9, 9, 0, 0, 0, 0, 
-	0, 0, 0, 0, 1, 1, 1, 1, 
+	0, 3, 0, 0, 1, 1, 1, 1, 
 	1, 1, 1, 1, 1, 1, 1, 1, 
 	0, 0, 7, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 7, 0, 
@@ -1524,7 +1543,7 @@ static const byte[] _http_request_parser_trans_actions = [
 	0, 0, 1, 1, 1, 1, 1, 1, 
 	1, 0, 9, 9, 0, 1, 1, 1, 
 	0, 0, 1, 1, 1, 1, 1, 1, 
-	0, 0, 0, 0, 0, 1, 1, 1, 
+	0, 0, 3, 0, 0, 1, 1, 1, 
 	1, 1, 1, 1, 1, 1, 1, 1, 
 	1, 0, 0, 7, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 7, 
@@ -1534,7 +1553,7 @@ static const byte[] _http_request_parser_trans_actions = [
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 1, 29, 29, 1, 0, 0, 1, 
 	1, 1, 1, 0, 9, 9, 0, 0, 
-	0, 1, 1, 1, 0, 0, 0, 0, 
+	0, 1, 1, 1, 0, 0, 3, 0, 
 	0, 1, 1, 1, 1, 1, 1, 1, 
 	1, 1, 1, 1, 1, 0, 0, 7, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
@@ -1566,12 +1585,12 @@ static const byte[] _http_request_parser_trans_actions = [
 	0, 0, 1, 1, 1, 1, 1, 1, 
 	1, 0, 9, 9, 0, 1, 1, 1, 
 	0, 0, 1, 1, 1, 1, 1, 1, 
-	0, 0, 0, 0, 0, 1, 1, 1, 
+	0, 0, 3, 0, 0, 1, 1, 1, 
 	1, 1, 1, 1, 1, 1, 1, 1, 
 	1, 0, 0, 0, 19, 41, 41, 19, 
 	0, 19, 19, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 9, 9, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
+	0, 0, 0, 0, 0, 0, 3, 0, 
 	0, 1, 1, 1, 1, 1, 1, 1, 
 	1, 1, 1, 1, 1, 0, 0, 0, 
 	9, 9, 1, 1, 1, 0, 0, 0, 
@@ -1583,7 +1602,7 @@ static const byte[] _http_request_parser_trans_actions = [
 	23, 44, 44, 23, 0, 23, 23, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 9, 9, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 1, 1, 1, 
+	0, 0, 3, 0, 0, 1, 1, 1, 
 	1, 1, 1, 1, 1, 1, 1, 1, 
 	1, 0, 0, 0, 23, 44, 44, 23, 
 	23, 23, 0, 0, 0, 9, 9, 0, 
@@ -1591,7 +1610,7 @@ static const byte[] _http_request_parser_trans_actions = [
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 23, 23, 23, 23, 23, 23, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 1, 1, 1, 1, 1, 
+	3, 0, 0, 1, 1, 1, 1, 1, 
 	1, 1, 1, 1, 1, 1, 1, 0, 
 	0, 0, 0, 0, 0, 0, 1, 1, 
 	1, 1, 1, 1, 1, 1, 1, 0, 
@@ -1606,7 +1625,7 @@ static const byte[] _http_request_parser_trans_actions = [
 	0, 0, 0, 0, 0, 23, 23, 23, 
 	23, 0, 23, 23, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 1, 1, 
+	0, 0, 0, 3, 0, 0, 1, 1, 
 	1, 1, 1, 1, 1, 1, 1, 1, 
 	1, 1, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 1, 1, 0, 0, 1, 
@@ -1622,9 +1641,9 @@ static const byte[] _http_request_parser_trans_actions = [
 	1, 1, 1, 1, 1, 0, 23, 23, 
 	23, 23, 0, 23, 23, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 1, 1, 1, 
+	0, 3, 0, 0, 0, 1, 1, 1, 
 	0, 1, 1, 0, 0, 1, 1, 1, 
-	1, 1, 1, 0, 0, 0, 0, 0, 
+	1, 1, 1, 0, 3, 0, 0, 0, 
 	0, 7, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 29, 
 	29, 1, 1, 0, 0, 0, 1, 0, 
@@ -1654,13 +1673,13 @@ static const byte[] _http_request_parser_trans_actions = [
 	1, 1, 1, 0, 0, 1, 1, 1, 
 	1, 1, 1, 1, 0, 9, 9, 0, 
 	0, 0, 1, 1, 0, 0, 1, 1, 
-	1, 1, 1, 1, 0, 0, 0, 0, 
+	1, 1, 1, 1, 0, 0, 3, 0, 
 	0, 1, 1, 1, 1, 1, 1, 1, 
 	1, 1, 1, 1, 1, 0, 0, 0, 
 	15, 38, 38, 15, 0, 15, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 9, 9, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 1, 
+	0, 0, 0, 0, 3, 0, 0, 1, 
 	1, 1, 1, 1, 1, 1, 1, 1, 
 	1, 1, 1, 0, 0, 0, 0, 0, 
 	0, 7, 0, 0, 0, 0, 0, 0, 
@@ -1690,7 +1709,7 @@ static const byte[] _http_request_parser_trans_actions = [
 	0, 0, 0, 1, 29, 29, 1, 1, 
 	1, 0, 0, 1, 1, 0, 9, 9, 
 	0, 0, 0, 0, 0, 1, 0, 0, 
-	0, 0, 0, 1, 1, 1, 1, 1, 
+	3, 0, 0, 1, 1, 1, 1, 1, 
 	1, 1, 1, 1, 1, 1, 1, 0, 
 	0, 0, 13, 35, 35, 13, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 7, 
@@ -1705,7 +1724,7 @@ static const byte[] _http_request_parser_trans_actions = [
 	0, 0, 0, 1, 29, 29, 1, 1, 
 	1, 0, 0, 1, 1, 1, 1, 0, 
 	9, 9, 0, 0, 0, 0, 0, 1, 
-	1, 1, 0, 0, 0, 0, 0, 1, 
+	1, 1, 0, 0, 3, 0, 0, 1, 
 	1, 1, 1, 1, 1, 1, 1, 1, 
 	1, 1, 1, 0, 0, 0, 9, 9, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
@@ -1771,13 +1790,13 @@ static const byte[] _http_request_parser_trans_actions = [
 	1, 1, 1, 1, 0, 0, 1, 1, 
 	1, 1, 1, 1, 1, 0, 9, 9, 
 	0, 0, 0, 1, 1, 0, 0, 1, 
-	1, 1, 1, 1, 1, 0, 0, 0, 
+	1, 1, 1, 1, 1, 0, 0, 3, 
 	0, 0, 1, 1, 1, 1, 1, 1, 
 	1, 1, 1, 1, 1, 1, 0, 0, 
 	0, 19, 41, 41, 19, 0, 19, 19, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 9, 9, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
+	0, 0, 0, 0, 0, 0, 3, 0, 
 	0, 1, 1, 1, 1, 1, 1, 1, 
 	1, 1, 1, 1, 1, 0, 0, 0, 
 	9, 9, 0, 0, 1, 1, 0, 0, 
@@ -1812,7 +1831,7 @@ static const byte[] _http_request_parser_trans_actions = [
 	0, 0, 0, 15, 38, 38, 15, 0, 
 	15, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 9, 9, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 1, 
+	0, 0, 0, 0, 3, 0, 0, 1, 
 	1, 1, 1, 1, 1, 1, 1, 1, 
 	1, 1, 1, 0, 0, 0, 0, 7, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
@@ -1833,7 +1852,7 @@ static const byte[] _http_request_parser_trans_actions = [
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 1, 29, 29, 1, 0, 0, 1, 
 	1, 0, 9, 9, 0, 0, 0, 1, 
-	0, 0, 0, 0, 0, 1, 1, 1, 
+	0, 0, 3, 0, 0, 1, 1, 1, 
 	1, 1, 1, 1, 1, 1, 1, 1, 
 	1, 0, 0, 0, 13, 35, 35, 13, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
@@ -1843,39 +1862,6 @@ static const byte[] _http_request_parser_trans_actions = [
 	27, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0
-];
-
-static const byte[] _http_request_parser_from_state_actions = [
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 3, 3
 ];
 
 static const byte[] _http_request_parser_eof_actions = [
@@ -1917,7 +1903,7 @@ static const int http_request_parser_error = 0;
 
 static const int http_request_parser_en_main = 1;
 
-#line 446 "parser.rl"
+#line 465 "parser.rl"
 
 
 public:
@@ -1925,11 +1911,11 @@ public:
     {
         super.init();
         
-#line 1929 "parser.d"
+#line 1915 "parser.d"
 	{
 	cs = http_request_parser_start;
 	}
-#line 453 "parser.rl"
+#line 472 "parser.rl"
     }
 
 protected:
@@ -1938,7 +1924,7 @@ protected:
         with(_request.requestLine) {
             with(*_request) {
                 
-#line 1942 "parser.d"
+#line 1928 "parser.d"
 	{
 	int _klen;
 	uint _trans;
@@ -1951,19 +1937,6 @@ protected:
 	if ( cs == 0 )
 		goto _out;
 _resume:
-	_acts = &_http_request_parser_actions[_http_request_parser_from_state_actions[cs]];
-	_nacts = cast(uint) *_acts++;
-	while ( _nacts-- > 0 ) {
-		switch ( *_acts++ ) {
-	case 1:
-#line 6 "parser.rl"
-	{ {p++; if (true) goto _out; } }
-	break;
-#line 1963 "parser.d"
-		default: break;
-		}
-	}
-
 	_keys = &_http_request_parser_trans_keys[_http_request_parser_key_offsets[cs]];
 	_trans = _http_request_parser_index_offsets[cs];
 
@@ -2027,6 +2000,10 @@ _match:
 	case 0:
 #line 5 "parser.rl"
 	{ mark = p; }
+	break;
+	case 1:
+#line 6 "parser.rl"
+	{ {p++; if (true) goto _out; } }
 	break;
 	case 2:
 #line 38 "parser.rl"
@@ -2130,7 +2107,7 @@ _match:
     }
 	break;
 	case 15:
-#line 418 "parser.rl"
+#line 437 "parser.rl"
 	{
             requestLine.method =
                 parseHttpMethod(mark[0..p - mark]);
@@ -2138,20 +2115,20 @@ _match:
         }
 	break;
 	case 16:
-#line 424 "parser.rl"
+#line 443 "parser.rl"
 	{
             requestLine.uri = mark[0..p - mark];
             mark = null;
         }
 	break;
 	case 17:
-#line 429 "parser.rl"
+#line 448 "parser.rl"
 	{
             _headerHandled = true;
             _string = &request.host;
         }
 	break;
-#line 2155 "parser.d"
+#line 2132 "parser.d"
 		default: break;
 		}
 	}
@@ -2175,7 +2152,7 @@ _again:
         mark = null;
     }
 	break;
-#line 2179 "parser.d"
+#line 2156 "parser.d"
 		default: break;
 		}
 	}
@@ -2183,7 +2160,7 @@ _again:
 
 	_out: {}
 	}
-#line 461 "parser.rl"
+#line 480 "parser.rl"
             }
         }
     }
@@ -2219,7 +2196,7 @@ class ResponseParser : RagelParser
     }
 private:
     
-#line 2223 "parser.d"
+#line 2200 "parser.d"
 static const byte[] _http_response_parser_actions = [
 	0, 1, 0, 1, 1, 1, 2, 1, 
 	3, 1, 4, 1, 5, 1, 6, 1, 
@@ -3150,12 +3127,12 @@ static const byte[] _http_response_parser_trans_actions = [
 	0, 5, 0, 0, 1, 0, 0, 0, 
 	0, 0, 25, 0, 32, 32, 0, 0, 
 	0, 1, 27, 27, 0, 0, 0, 0, 
-	0, 0, 1, 1, 1, 1, 1, 1, 
-	1, 1, 1, 1, 1, 1, 0, 0, 
+	3, 0, 1, 1, 1, 1, 1, 1, 
+	1, 1, 1, 1, 1, 1, 0, 3, 
 	0, 0, 7, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 29, 29, 0, 0, 
 	0, 1, 9, 9, 0, 0, 0, 0, 
-	0, 0, 0, 0, 1, 1, 1, 1, 
+	0, 3, 0, 0, 1, 1, 1, 1, 
 	1, 1, 1, 1, 1, 1, 1, 1, 
 	0, 0, 7, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 7, 0, 
@@ -3176,7 +3153,7 @@ static const byte[] _http_response_parser_trans_actions = [
 	0, 0, 1, 1, 1, 1, 1, 1, 
 	1, 0, 9, 9, 0, 1, 1, 1, 
 	0, 0, 1, 1, 1, 1, 1, 1, 
-	0, 0, 0, 0, 0, 1, 1, 1, 
+	0, 0, 3, 0, 0, 1, 1, 1, 
 	1, 1, 1, 1, 1, 1, 1, 1, 
 	1, 0, 0, 7, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 7, 
@@ -3192,7 +3169,7 @@ static const byte[] _http_response_parser_trans_actions = [
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 1, 29, 29, 1, 0, 0, 1, 
 	1, 1, 0, 9, 9, 0, 0, 0, 
-	1, 1, 0, 0, 0, 0, 0, 1, 
+	1, 1, 0, 0, 3, 0, 0, 1, 
 	1, 1, 1, 1, 1, 1, 1, 1, 
 	1, 1, 1, 0, 0, 7, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
@@ -3224,12 +3201,12 @@ static const byte[] _http_response_parser_trans_actions = [
 	1, 1, 1, 1, 1, 1, 1, 0, 
 	9, 9, 0, 1, 1, 1, 0, 0, 
 	1, 1, 1, 1, 1, 1, 0, 0, 
-	0, 0, 0, 1, 1, 1, 1, 1, 
+	3, 0, 0, 1, 1, 1, 1, 1, 
 	1, 1, 1, 1, 1, 1, 1, 0, 
 	0, 0, 19, 44, 44, 19, 0, 19, 
 	19, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 9, 9, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 1, 
+	0, 0, 0, 0, 3, 0, 0, 1, 
 	1, 1, 1, 1, 1, 1, 1, 1, 
 	1, 1, 1, 0, 0, 0, 9, 9, 
 	1, 1, 1, 0, 0, 0, 1, 1, 
@@ -3241,14 +3218,14 @@ static const byte[] _http_response_parser_trans_actions = [
 	47, 23, 0, 23, 23, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 9, 
 	9, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 1, 1, 1, 1, 1, 
+	3, 0, 0, 1, 1, 1, 1, 1, 
 	1, 1, 1, 1, 1, 1, 1, 0, 
 	0, 0, 23, 47, 47, 23, 23, 23, 
 	0, 0, 0, 9, 9, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	23, 23, 23, 23, 23, 23, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
+	0, 0, 0, 0, 0, 0, 3, 0, 
 	0, 1, 1, 1, 1, 1, 1, 1, 
 	1, 1, 1, 1, 1, 0, 0, 0, 
 	0, 0, 0, 0, 1, 1, 1, 1, 
@@ -3264,7 +3241,7 @@ static const byte[] _http_response_parser_trans_actions = [
 	0, 0, 0, 23, 23, 23, 23, 0, 
 	23, 23, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 1, 1, 1, 1, 
+	0, 3, 0, 0, 1, 1, 1, 1, 
 	1, 1, 1, 1, 1, 1, 1, 1, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 1, 1, 0, 0, 1, 1, 1, 
@@ -3279,10 +3256,10 @@ static const byte[] _http_response_parser_trans_actions = [
 	1, 1, 0, 0, 0, 1, 1, 1, 
 	1, 1, 1, 0, 23, 23, 23, 23, 
 	0, 23, 23, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
+	0, 0, 0, 0, 0, 0, 0, 3, 
 	0, 0, 0, 1, 1, 1, 0, 1, 
 	1, 0, 0, 1, 1, 1, 1, 1, 
-	1, 0, 0, 0, 0, 0, 0, 7, 
+	1, 0, 3, 0, 0, 0, 0, 7, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 29, 29, 1, 
 	1, 0, 0, 0, 1, 0, 0, 0, 
@@ -3312,13 +3289,13 @@ static const byte[] _http_response_parser_trans_actions = [
 	1, 0, 0, 1, 1, 1, 1, 1, 
 	1, 1, 0, 9, 9, 0, 0, 0, 
 	1, 1, 0, 0, 1, 1, 1, 1, 
-	1, 1, 0, 0, 0, 0, 0, 1, 
+	1, 1, 0, 0, 3, 0, 0, 1, 
 	1, 1, 1, 1, 1, 1, 1, 1, 
 	1, 1, 1, 0, 0, 0, 15, 41, 
 	41, 15, 0, 15, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	9, 9, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 1, 1, 1, 
+	0, 0, 3, 0, 0, 1, 1, 1, 
 	1, 1, 1, 1, 1, 1, 1, 1, 
 	1, 0, 0, 0, 0, 0, 0, 7, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
@@ -3347,7 +3324,7 @@ static const byte[] _http_response_parser_trans_actions = [
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 1, 29, 29, 1, 1, 1, 0, 
 	0, 1, 1, 0, 9, 9, 0, 0, 
-	0, 0, 0, 1, 0, 0, 0, 0, 
+	0, 0, 0, 1, 0, 0, 3, 0, 
 	0, 1, 1, 1, 1, 1, 1, 1, 
 	1, 1, 1, 1, 1, 0, 0, 0, 
 	13, 38, 38, 13, 0, 0, 0, 0, 
@@ -3372,7 +3349,7 @@ static const byte[] _http_response_parser_trans_actions = [
 	0, 1, 29, 29, 1, 1, 1, 0, 
 	0, 1, 1, 1, 0, 9, 9, 0, 
 	0, 0, 0, 0, 1, 1, 0, 0, 
-	0, 0, 0, 1, 1, 1, 1, 1, 
+	3, 0, 0, 1, 1, 1, 1, 1, 
 	1, 1, 1, 1, 1, 1, 1, 0, 
 	0, 0, 9, 9, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
@@ -3425,13 +3402,13 @@ static const byte[] _http_response_parser_trans_actions = [
 	0, 0, 1, 1, 1, 1, 1, 1, 
 	1, 0, 9, 9, 0, 0, 0, 1, 
 	1, 0, 0, 1, 1, 1, 1, 1, 
-	1, 0, 0, 0, 0, 0, 1, 1, 
+	1, 0, 0, 3, 0, 0, 1, 1, 
 	1, 1, 1, 1, 1, 1, 1, 1, 
 	1, 1, 0, 0, 0, 19, 44, 44, 
 	19, 0, 19, 19, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	9, 9, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 1, 1, 1, 
+	0, 0, 3, 0, 0, 1, 1, 1, 
 	1, 1, 1, 1, 1, 1, 1, 1, 
 	1, 0, 0, 0, 9, 9, 0, 0, 
 	1, 1, 0, 0, 0, 1, 1, 1, 
@@ -3455,7 +3432,7 @@ static const byte[] _http_response_parser_trans_actions = [
 	0, 15, 41, 41, 15, 0, 15, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 9, 9, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 1, 1, 1, 
+	0, 0, 3, 0, 0, 1, 1, 1, 
 	1, 1, 1, 1, 1, 1, 1, 1, 
 	1, 0, 0, 0, 0, 7, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
@@ -3476,43 +3453,11 @@ static const byte[] _http_response_parser_trans_actions = [
 	0, 0, 0, 0, 0, 0, 0, 1, 
 	29, 29, 1, 0, 0, 1, 1, 0, 
 	9, 9, 0, 0, 0, 1, 0, 0, 
-	0, 0, 0, 1, 1, 1, 1, 1, 
+	3, 0, 0, 1, 1, 1, 1, 1, 
 	1, 1, 1, 1, 1, 1, 1, 0, 
 	0, 0, 13, 38, 38, 13, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0
-];
-
-static const byte[] _http_response_parser_from_state_actions = [
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 3, 
-	3
 ];
 
 static const byte[] _http_response_parser_eof_actions = [
@@ -3553,7 +3498,7 @@ static const int http_response_parser_error = 0;
 
 static const int http_response_parser_en_main = 1;
 
-#line 527 "parser.rl"
+#line 546 "parser.rl"
 
 
 public:
@@ -3561,11 +3506,11 @@ public:
     {
         super.init();
         
-#line 3565 "parser.d"
+#line 3510 "parser.d"
 	{
 	cs = http_response_parser_start;
 	}
-#line 534 "parser.rl"
+#line 553 "parser.rl"
     }
 
 protected:
@@ -3574,7 +3519,7 @@ protected:
         with(_response.status) {
             with(*_response) {
                 
-#line 3578 "parser.d"
+#line 3523 "parser.d"
 	{
 	int _klen;
 	uint _trans;
@@ -3587,19 +3532,6 @@ protected:
 	if ( cs == 0 )
 		goto _out;
 _resume:
-	_acts = &_http_response_parser_actions[_http_response_parser_from_state_actions[cs]];
-	_nacts = cast(uint) *_acts++;
-	while ( _nacts-- > 0 ) {
-		switch ( *_acts++ ) {
-	case 1:
-#line 6 "parser.rl"
-	{ {p++; if (true) goto _out; } }
-	break;
-#line 3599 "parser.d"
-		default: break;
-		}
-	}
-
 	_keys = &_http_response_parser_trans_keys[_http_response_parser_key_offsets[cs]];
 	_trans = _http_response_parser_index_offsets[cs];
 
@@ -3663,6 +3595,10 @@ _match:
 	case 0:
 #line 5 "parser.rl"
 	{ mark = p; }
+	break;
+	case 1:
+#line 6 "parser.rl"
+	{ {p++; if (true) goto _out; } }
 	break;
 	case 2:
 #line 38 "parser.rl"
@@ -3766,27 +3702,27 @@ _match:
     }
 	break;
 	case 15:
-#line 500 "parser.rl"
+#line 519 "parser.rl"
 	{
             status.status = cast(Status)to!(int)(mark[0..p - mark]);
             mark = null;
         }
 	break;
 	case 16:
-#line 505 "parser.rl"
+#line 524 "parser.rl"
 	{
             status.reason = mark[0..p - mark];
             mark = null;
         }
 	break;
 	case 17:
-#line 510 "parser.rl"
+#line 529 "parser.rl"
 	{
             _headerHandled = true;
             _string = &response.location;
         }
 	break;
-#line 3790 "parser.d"
+#line 3726 "parser.d"
 		default: break;
 		}
 	}
@@ -3810,7 +3746,7 @@ _again:
         mark = null;
     }
 	break;
-#line 3814 "parser.d"
+#line 3750 "parser.d"
 		default: break;
 		}
 	}
@@ -3818,7 +3754,7 @@ _again:
 
 	_out: {}
 	}
-#line 542 "parser.rl"
+#line 561 "parser.rl"
             }
         }
     }

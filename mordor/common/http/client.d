@@ -177,7 +177,11 @@ private:
                     _waitingResponses.remove(it.val);
                     _log.trace("Scheduling request {}", it.val);
                     it.val._scheduler.schedule(it.val._fiber);
+                } else {
+                    _log.trace("Response fiber is not waiting for response... doing nothing");
                 }
+            } else {
+                _log.trace("All requests processed");
             }
         }
     }
@@ -203,9 +207,12 @@ public:
     
     Stream requestStream()
     {
-        return _conn.getStream(_request.general, _request.entity, _request.requestLine.method, Status.init);
+        if (_requestStream !is null)
+            return _requestStream;
+        with (_request) {
+            return _requestStream = _conn.getStream(general, entity, requestLine.method, Status.init, &requestDone);
+        }
     }
-    
     /*
     Multipart requestMultipart();
      */
@@ -218,31 +225,22 @@ public:
     
     Stream responseStream()
     {
-        _log.trace("this: {} cr conn: {}", cast(void*)this, cast(void*)_conn);
+        if (_responseStream !is null)
+            return _responseStream;
         ensureResponse();
-        return _conn.getStream(_response.general, _response.entity, _request.requestLine.method, _response.status.status);
+        with (_response) {
+            return _responseStream = _conn.getStream(general, entity, _request.requestLine.method, status.status, &responseDone);
+        }
     }
 
     /*
     Multipart responseMultipart();
    */
     
-    EntityHeaders trailer()
+    EntityHeaders responseTrailer()
     {
         assert(_hasTrailer);
-        return _trailer;
-    }
-    
-    void requestDone()
-    {
-        _conn.scheduleNextRequest();
-    }
-    
-    void responseDone()
-    {
-        _responseDone = true;
-        // TODO: read the trailer, if possible
-        _conn.scheduleNextResponse();
+        return _responseTrailer;
     }
     
     void abort()
@@ -310,6 +308,7 @@ private:
                 void[][] bufs = buffer.readBufs;
                 while (bufs.length > 0) {
                     size_t consumed = parser.run(cast(char[])bufs[0], false);
+                    _log.trace("parser consumed '{}'", (cast(char[])bufs[0])[0..consumed]);
                     buffer.consume(consumed);
                     if (parser.complete || parser.error)
                         break;
@@ -366,6 +365,19 @@ private:
             }
         }
     }
+    
+    void requestDone()
+    {
+        // TODO: write the trailer, if required
+        _conn.scheduleNextRequest();
+    }
+    
+    void responseDone()
+    {
+        _responseDone = true;
+        // TODO: read the trailer, if possible
+        _conn.scheduleNextResponse();
+    }
 
 private:
     ClientConnection _conn;
@@ -373,7 +385,8 @@ private:
     Fiber _fiber;
     Request _request;
     Response _response;
-    EntityHeaders _trailer;
+    EntityHeaders _requestTrailer, _responseTrailer;
+    Stream _requestStream, _responseStream;
     bool _requestDone;
     bool _hasResponse;
     bool _hasTrailer;

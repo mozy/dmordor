@@ -5,6 +5,7 @@ import mordor.common.scheduler;
 import mordor.common.streams.buffered;
 import mordor.common.streams.duplex;
 import mordor.common.streams.limited;
+import mordor.common.streams.notify;
 import mordor.common.streams.singleplex;
 
 package abstract class Connection
@@ -70,7 +71,7 @@ protected:
         }
     }
 
-    Stream getStream(GeneralHeaders general, EntityHeaders entity, Method method, Status status)
+    Stream getStream(GeneralHeaders general, EntityHeaders entity, Method method, Status status, void delegate() notifyOnEof)
     in
     {
         assert(hasMessageBody(general, entity, method, status));
@@ -93,12 +94,18 @@ protected:
         if (stream !is _stream) {
             return stream;
         } else if (entity.contentLength != ~0) {
-            return new LimitedStream(stream, entity.contentLength);
+            auto notify = new NotifyStream(stream, false);
+            notify.notifyOnClose = notifyOnEof;
+            auto limited = new LimitedStream(notify, entity.contentLength);
+            limited.closeOnEof = true;
+            return limited;
         // TODO: else if (entity.contentType.major == "multipart") return stream;
         } else {
             // Delimited by closing the connection
             assert(general.connection !is null && general.connection.find("close") != general.connection.end);
-            return stream;
+            auto notify = new NotifyStream(stream, false);
+            notify.notifyOnEof = notifyOnEof;
+            return notify;
         }
     }
 

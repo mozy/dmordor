@@ -23,6 +23,9 @@ public:
     bool supportsSize() { return true; }
     bool supportsTruncate() { return false; }
     
+    bool closeOnEof() { return _closeOnEof; }
+    void closeOnEof(bool v) { _closeOnEof = v; }
+    
     size_t read(Buffer b, size_t len)
     {
         if (_pos >= _size) {
@@ -31,6 +34,9 @@ public:
         len = min(len, _size - _pos);
         size_t result = super.read(b, len);
         _pos += result;
+        if (_pos == _size && _closeOnEof) {
+            super.close(CloseType.READ);
+        }
         return result;
     }
     
@@ -42,6 +48,9 @@ public:
         len = min(len, _size - _pos);
         size_t result = super.write(b, len);
         _pos += result;
+        if (_pos == _size && _closeOnEof) {
+            super.close(CloseType.WRITE);
+        }
         return result;
     }
     
@@ -81,4 +90,5 @@ public:
     
 private:
     long _pos, _size;
+    bool _closeOnEof;
 }
