@@ -12,7 +12,7 @@ import mordor.common.streams.stream;
 import mordor.common.streams.transfer;
 import mordor.common.stringutils;
 
-private Logger _log, _fiberLog;
+private Logger _log;
 
 static this()
 {
