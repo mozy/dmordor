@@ -51,14 +51,14 @@ body
     
     void write()
     {
-        while(writeBuffer.readAvailable > 0) {
-            try {
+        try {
+            while(writeBuffer.readAvailable > 0) {
                  writeResult = dst.write(*writeBuffer, writeBuffer.readAvailable);
                  writeBuffer.consume(writeResult);
                  totalWritten += writeResult;
-            } catch (Exception ex) {
-                writeException = ex;
             }
+        } catch (Exception ex) {
+            writeException = ex;
         }
     }
     
