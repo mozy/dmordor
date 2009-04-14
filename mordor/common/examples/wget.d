@@ -14,6 +14,7 @@ import mordor.common.streams.socket;
 import mordor.common.streams.std;
 import mordor.common.streams.transfer;
 import mordor.common.stringutils;
+import mordor.common.streams.nil;
 
 void main(string[] args)
 {
@@ -33,6 +34,8 @@ void main(string[] args)
         requestHeaders.requestLine.uri = args[3];
         requestHeaders.general.connection = new StringSet;
         requestHeaders.general.connection.insert("close");
+        if (args.length > 4)
+            requestHeaders.request.host = args[4];
         auto request = conn.request(requestHeaders);
         scope (failure) request.abort();
         scope stdout = new StdoutStream();

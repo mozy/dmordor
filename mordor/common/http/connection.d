@@ -1,9 +1,12 @@
 module mordor.common.http.connection;
 
+import mordor.common.http.chunked;
 import mordor.common.http.parser;
 import mordor.common.scheduler;
 import mordor.common.streams.buffered;
+import mordor.common.streams.deflate;
 import mordor.common.streams.duplex;
+import mordor.common.streams.gzip;
 import mordor.common.streams.limited;
 import mordor.common.streams.notify;
 import mordor.common.streams.singleplex;
@@ -22,9 +25,10 @@ protected:
     {
         _readStream = cast(BufferedStream)stream;
         if (_readStream is null) {
-            _readStream = new BufferedStream(stream/+, new SingleplexStream(stream, SingleplexStream.Type.READ)+/);
+            _readStream = new BufferedStream(new SingleplexStream(stream, SingleplexStream.Type.READ, false));
         }
         _readStream.allowPartialReads = true;
+        _writeStream = new SingleplexStream(stream, SingleplexStream.Type.WRITE, false);
         _stream = new DuplexStream(_readStream, stream);
     }
     
@@ -71,27 +75,41 @@ protected:
         }
     }
 
-    Stream getStream(GeneralHeaders general, EntityHeaders entity, Method method, Status status, void delegate() notifyOnEof)
+    Stream getStream(GeneralHeaders general, EntityHeaders entity, Method method, Status status, void delegate() notifyOnEof, bool forRead)
     in
     {
         assert(hasMessageBody(general, entity, method, status));
     }
     body
     {
-        Stream stream = _stream;
+        Stream stream;
+        if (forRead)
+            stream = _readStream;
+        else
+            stream = _writeStream;
+        Stream baseStream = stream;
         foreach (tc; general.transferEncoding) {
-            // TODO: throw exceptions, not assert
-            assert(tc.value == "identity" || tc.value == "chunked");
-            assert(tc.parameters.length == 0);
             switch (tc.value) {
-                case "identity":
-                    break;
                 case "chunked":
-                    // TODO: chunked stream
+                    stream = new ChunkedStream(stream);
+                    auto notify = new NotifyStream(stream);
+                    notify.notifyOnEof = notifyOnEof;
+                    stream = notify;
                     break;
+                case "deflate":
+                    stream = new DeflateStream(stream);
+                    break;
+                case "gzip":
+                case "x-gzip":
+                    stream = new GzipStream(stream);
+                    break;
+                case "identity":
+                case "compress":
+                case "x-compress":
+                    assert(false);
             }
         }
-        if (stream !is _stream) {
+        if (stream !is baseStream) {
             return stream;
         } else if (entity.contentLength != ~0) {
             auto notify = new NotifyStream(stream, false);
@@ -111,5 +129,5 @@ protected:
 
 protected:
     BufferedStream _readStream;
-    Stream _stream;
+    Stream _stream, _writeStream;
 }

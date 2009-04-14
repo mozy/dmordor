@@ -187,7 +187,7 @@ struct RequestHeaders
     {
         string ret;
         if (host.length > 0)
-            ret ~= "Host: " ~ ret ~ "\r\n";
+            ret ~= "Host: " ~ host ~ "\r\n";
         return ret;
     }
 }
@@ -474,10 +474,8 @@ public:
 protected:
     void exec()
     {
-        with(_request.requestLine) {
-            with(*_request) {
-                %% write exec;
-            }
+        with(_request.requestLine) with(_request.entity) with(*_request) {
+            %% write exec;
         }
     }
 
@@ -555,10 +553,8 @@ public:
 protected:
     void exec()
     {
-        with(_response.status) {
-            with(*_response) {
-                %% write exec;
-            }
+        with(_response.status) with(_response.entity) with (*_response) {
+            %% write exec;
         }
     }
 
@@ -580,6 +576,67 @@ public:
 
 private:    
     Response* _response;
+    bool _headerHandled;
+    string _temp1;
+    string _temp2;
+    StringSet _list;
+    ParameterizedList* _parameterizedList;
+    string* _string;
+    ulong* _ulong;
+    static Logger _log;
+}
+
+class TrailerParser : RagelParser
+{
+    static this()
+    {
+        _log = Log.lookup("mordor.common.http.parser.trailer");
+    }
+private:
+    %%{
+        machine http_trailer_parser;
+        include http_parser "basics.rl";
+
+        trailer = (entity_header CRLF)*;
+    
+        main := trailer CRLF @done;
+
+        write data;
+    }%%
+
+public:
+    void init()
+    {
+        super.init();
+        %% write init;
+    }
+
+protected:
+    void exec()
+    {
+        with(*_entity) {
+            %% write exec;
+        }
+    }
+
+public:
+    this(ref EntityHeaders entity)
+    {
+        _entity = &entity;
+    }
+        
+    bool complete()
+    {
+        return cs >= http_trailer_parser_first_final;
+    }
+
+    bool error()
+    {
+        return cs == http_trailer_parser_error;
+    }
+
+private:    
+    EntityHeaders* _entity;
     bool _headerHandled;
     string _temp1;
     string _temp2;

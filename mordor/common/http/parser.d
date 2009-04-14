@@ -188,7 +188,7 @@ struct RequestHeaders
     {
         string ret;
         if (host.length > 0)
-            ret ~= "Host: " ~ ret ~ "\r\n";
+            ret ~= "Host: " ~ host ~ "\r\n";
         return ret;
     }
 }
@@ -1921,10 +1921,9 @@ public:
 protected:
     void exec()
     {
-        with(_request.requestLine) {
-            with(*_request) {
-                
-#line 1928 "parser.d"
+        with(_request.requestLine) with(_request.entity) with(*_request) {
+            
+#line 1927 "parser.d"
 	{
 	int _klen;
 	uint _trans;
@@ -2028,9 +2027,9 @@ _match:
         } else {
             char[] fieldValue = mark[0..p - mark];
             unfold(fieldValue);
-            string* value = _temp1 in entity.extension;
+            string* value = _temp1 in extension;
             if (value is null) {
-                entity.extension[_temp1] = fieldValue;
+                extension[_temp1] = fieldValue;
             } else {
                 *value ~= ", " ~ fieldValue;
             }
@@ -2103,7 +2102,7 @@ _match:
 #line 151 "parser.rl"
 	{
         _headerHandled = true;
-        _ulong = &entity.contentLength;
+        _ulong = &contentLength;
     }
 	break;
 	case 15:
@@ -2128,7 +2127,7 @@ _match:
             _string = &request.host;
         }
 	break;
-#line 2132 "parser.d"
+#line 2131 "parser.d"
 		default: break;
 		}
 	}
@@ -2152,7 +2151,7 @@ _again:
         mark = null;
     }
 	break;
-#line 2156 "parser.d"
+#line 2155 "parser.d"
 		default: break;
 		}
 	}
@@ -2160,8 +2159,7 @@ _again:
 
 	_out: {}
 	}
-#line 480 "parser.rl"
-            }
+#line 479 "parser.rl"
         }
     }
 
@@ -2196,7 +2194,7 @@ class ResponseParser : RagelParser
     }
 private:
     
-#line 2200 "parser.d"
+#line 2198 "parser.d"
 static const byte[] _http_response_parser_actions = [
 	0, 1, 0, 1, 1, 1, 2, 1, 
 	3, 1, 4, 1, 5, 1, 6, 1, 
@@ -3498,7 +3496,7 @@ static const int http_response_parser_error = 0;
 
 static const int http_response_parser_en_main = 1;
 
-#line 546 "parser.rl"
+#line 544 "parser.rl"
 
 
 public:
@@ -3506,20 +3504,19 @@ public:
     {
         super.init();
         
-#line 3510 "parser.d"
+#line 3508 "parser.d"
 	{
 	cs = http_response_parser_start;
 	}
-#line 553 "parser.rl"
+#line 551 "parser.rl"
     }
 
 protected:
     void exec()
     {
-        with(_response.status) {
-            with(*_response) {
-                
-#line 3523 "parser.d"
+        with(_response.status) with(_response.entity) with (*_response) {
+            
+#line 3520 "parser.d"
 	{
 	int _klen;
 	uint _trans;
@@ -3623,9 +3620,9 @@ _match:
         } else {
             char[] fieldValue = mark[0..p - mark];
             unfold(fieldValue);
-            string* value = _temp1 in entity.extension;
+            string* value = _temp1 in extension;
             if (value is null) {
-                entity.extension[_temp1] = fieldValue;
+                extension[_temp1] = fieldValue;
             } else {
                 *value ~= ", " ~ fieldValue;
             }
@@ -3698,31 +3695,31 @@ _match:
 #line 151 "parser.rl"
 	{
         _headerHandled = true;
-        _ulong = &entity.contentLength;
+        _ulong = &contentLength;
     }
 	break;
 	case 15:
-#line 519 "parser.rl"
+#line 517 "parser.rl"
 	{
             status.status = cast(Status)to!(int)(mark[0..p - mark]);
             mark = null;
         }
 	break;
 	case 16:
-#line 524 "parser.rl"
+#line 522 "parser.rl"
 	{
             status.reason = mark[0..p - mark];
             mark = null;
         }
 	break;
 	case 17:
-#line 529 "parser.rl"
+#line 527 "parser.rl"
 	{
             _headerHandled = true;
             _string = &response.location;
         }
 	break;
-#line 3726 "parser.d"
+#line 3723 "parser.d"
 		default: break;
 		}
 	}
@@ -3746,7 +3743,7 @@ _again:
         mark = null;
     }
 	break;
-#line 3750 "parser.d"
+#line 3747 "parser.d"
 		default: break;
 		}
 	}
@@ -3754,8 +3751,7 @@ _again:
 
 	_out: {}
 	}
-#line 561 "parser.rl"
-            }
+#line 558 "parser.rl"
         }
     }
 
@@ -3777,6 +3773,343 @@ public:
 
 private:    
     Response* _response;
+    bool _headerHandled;
+    string _temp1;
+    string _temp2;
+    StringSet _list;
+    ParameterizedList* _parameterizedList;
+    string* _string;
+    ulong* _ulong;
+    static Logger _log;
+}
+
+class TrailerParser : RagelParser
+{
+    static this()
+    {
+        _log = Log.lookup("mordor.common.http.parser.trailer");
+    }
+private:
+    
+#line 3795 "parser.d"
+static const byte[] _http_trailer_parser_actions = [
+	0, 1, 0, 1, 1, 1, 2, 1, 
+	3, 1, 4, 2, 0, 3, 2, 4, 
+	3, 2, 5, 2
+];
+
+static const short[] _http_trailer_parser_key_offsets = [
+	0, 0, 18, 19, 35, 42, 49, 69, 
+	86, 103, 120, 137, 154, 171, 187, 204, 
+	221, 238, 255, 272, 289, 305, 314, 323, 
+	343, 344, 353, 354
+];
+
+static const char[] _http_trailer_parser_trans_keys = [
+	10u, 13u, 33u, 67u, 124u, 126u, 35u, 39u, 
+	42u, 43u, 45u, 46u, 48u, 57u, 65u, 90u, 
+	94u, 122u, 10u, 33u, 58u, 124u, 126u, 35u, 
+	39u, 42u, 43u, 45u, 46u, 48u, 57u, 65u, 
+	90u, 94u, 122u, 10u, 13u, 127u, 0u, 8u, 
+	11u, 31u, 10u, 13u, 127u, 0u, 8u, 11u, 
+	31u, 9u, 10u, 13u, 32u, 33u, 67u, 124u, 
+	126u, 35u, 39u, 42u, 43u, 45u, 46u, 48u, 
+	57u, 65u, 90u, 94u, 122u, 33u, 58u, 111u, 
+	124u, 126u, 35u, 39u, 42u, 43u, 45u, 46u, 
+	48u, 57u, 65u, 90u, 94u, 122u, 33u, 58u, 
+	110u, 124u, 126u, 35u, 39u, 42u, 43u, 45u, 
+	46u, 48u, 57u, 65u, 90u, 94u, 122u, 33u, 
+	58u, 116u, 124u, 126u, 35u, 39u, 42u, 43u, 
+	45u, 46u, 48u, 57u, 65u, 90u, 94u, 122u, 
+	33u, 58u, 101u, 124u, 126u, 35u, 39u, 42u, 
+	43u, 45u, 46u, 48u, 57u, 65u, 90u, 94u, 
+	122u, 33u, 58u, 110u, 124u, 126u, 35u, 39u, 
+	42u, 43u, 45u, 46u, 48u, 57u, 65u, 90u, 
+	94u, 122u, 33u, 58u, 116u, 124u, 126u, 35u, 
+	39u, 42u, 43u, 45u, 46u, 48u, 57u, 65u, 
+	90u, 94u, 122u, 33u, 45u, 46u, 58u, 124u, 
+	126u, 35u, 39u, 42u, 43u, 48u, 57u, 65u, 
+	90u, 94u, 122u, 33u, 58u, 76u, 124u, 126u, 
+	35u, 39u, 42u, 43u, 45u, 46u, 48u, 57u, 
+	65u, 90u, 94u, 122u, 33u, 58u, 101u, 124u, 
+	126u, 35u, 39u, 42u, 43u, 45u, 46u, 48u, 
+	57u, 65u, 90u, 94u, 122u, 33u, 58u, 110u, 
+	124u, 126u, 35u, 39u, 42u, 43u, 45u, 46u, 
+	48u, 57u, 65u, 90u, 94u, 122u, 33u, 58u, 
+	103u, 124u, 126u, 35u, 39u, 42u, 43u, 45u, 
+	46u, 48u, 57u, 65u, 90u, 94u, 122u, 33u, 
+	58u, 116u, 124u, 126u, 35u, 39u, 42u, 43u, 
+	45u, 46u, 48u, 57u, 65u, 90u, 94u, 122u, 
+	33u, 58u, 104u, 124u, 126u, 35u, 39u, 42u, 
+	43u, 45u, 46u, 48u, 57u, 65u, 90u, 94u, 
+	122u, 33u, 58u, 124u, 126u, 35u, 39u, 42u, 
+	43u, 45u, 46u, 48u, 57u, 65u, 90u, 94u, 
+	122u, 9u, 10u, 13u, 32u, 127u, 0u, 31u, 
+	48u, 57u, 9u, 10u, 13u, 32u, 127u, 0u, 
+	31u, 48u, 57u, 9u, 10u, 13u, 32u, 33u, 
+	67u, 124u, 126u, 35u, 39u, 42u, 43u, 45u, 
+	46u, 48u, 57u, 65u, 90u, 94u, 122u, 10u, 
+	9u, 10u, 13u, 32u, 127u, 0u, 31u, 48u, 
+	57u, 10u, 0
+];
+
+static const byte[] _http_trailer_parser_single_lengths = [
+	0, 6, 1, 4, 3, 3, 8, 5, 
+	5, 5, 5, 5, 5, 6, 5, 5, 
+	5, 5, 5, 5, 4, 5, 5, 8, 
+	1, 5, 1, 0
+];
+
+static const byte[] _http_trailer_parser_range_lengths = [
+	0, 6, 0, 6, 2, 2, 6, 6, 
+	6, 6, 6, 6, 6, 5, 6, 6, 
+	6, 6, 6, 6, 6, 2, 2, 6, 
+	0, 2, 0, 0
+];
+
+static const short[] _http_trailer_parser_index_offsets = [
+	0, 0, 13, 15, 26, 32, 38, 53, 
+	65, 77, 89, 101, 113, 125, 137, 149, 
+	161, 173, 185, 197, 209, 220, 228, 236, 
+	251, 253, 261, 263
+];
+
+static const byte[] _http_trailer_parser_indicies = [
+	0, 2, 3, 4, 3, 3, 3, 3, 
+	3, 3, 3, 3, 1, 0, 1, 5, 
+	6, 5, 5, 5, 5, 5, 5, 5, 
+	5, 1, 8, 9, 1, 1, 1, 7, 
+	11, 12, 1, 1, 1, 10, 10, 0, 
+	2, 10, 3, 4, 3, 3, 3, 3, 
+	3, 3, 3, 3, 1, 5, 6, 13, 
+	5, 5, 5, 5, 5, 5, 5, 5, 
+	1, 5, 6, 14, 5, 5, 5, 5, 
+	5, 5, 5, 5, 1, 5, 6, 15, 
+	5, 5, 5, 5, 5, 5, 5, 5, 
+	1, 5, 6, 16, 5, 5, 5, 5, 
+	5, 5, 5, 5, 1, 5, 6, 17, 
+	5, 5, 5, 5, 5, 5, 5, 5, 
+	1, 5, 6, 18, 5, 5, 5, 5, 
+	5, 5, 5, 5, 1, 5, 19, 5, 
+	6, 5, 5, 5, 5, 5, 5, 5, 
+	1, 5, 6, 20, 5, 5, 5, 5, 
+	5, 5, 5, 5, 1, 5, 6, 21, 
+	5, 5, 5, 5, 5, 5, 5, 5, 
+	1, 5, 6, 22, 5, 5, 5, 5, 
+	5, 5, 5, 5, 1, 5, 6, 23, 
+	5, 5, 5, 5, 5, 5, 5, 5, 
+	1, 5, 6, 24, 5, 5, 5, 5, 
+	5, 5, 5, 5, 1, 5, 6, 25, 
+	5, 5, 5, 5, 5, 5, 5, 5, 
+	1, 5, 26, 5, 5, 5, 5, 5, 
+	5, 5, 5, 1, 27, 28, 29, 27, 
+	1, 1, 30, 7, 31, 32, 33, 31, 
+	1, 1, 30, 10, 31, 0, 2, 31, 
+	3, 4, 3, 3, 3, 3, 3, 3, 
+	3, 3, 1, 34, 1, 35, 36, 37, 
+	35, 1, 1, 38, 10, 39, 1, 1, 
+	0
+];
+
+static const byte[] _http_trailer_parser_trans_targs = [
+	27, 0, 2, 3, 7, 3, 4, 5, 
+	6, 26, 5, 6, 26, 8, 9, 10, 
+	11, 12, 13, 14, 15, 16, 17, 18, 
+	19, 20, 21, 22, 23, 24, 25, 22, 
+	23, 24, 23, 5, 6, 26, 25, 6
+];
+
+static const byte[] _http_trailer_parser_trans_actions = [
+	3, 0, 0, 1, 1, 0, 5, 1, 
+	11, 11, 0, 7, 7, 0, 0, 0, 
+	0, 0, 0, 0, 0, 0, 0, 0, 
+	0, 0, 17, 1, 11, 11, 1, 0, 
+	7, 7, 0, 9, 14, 14, 0, 0
+];
+
+static const int http_trailer_parser_start = 1;
+static const int http_trailer_parser_first_final = 27;
+static const int http_trailer_parser_error = 0;
+
+static const int http_trailer_parser_en_main = 1;
+
+#line 605 "parser.rl"
+
+
+public:
+    void init()
+    {
+        super.init();
+        
+#line 3945 "parser.d"
+	{
+	cs = http_trailer_parser_start;
+	}
+#line 612 "parser.rl"
+    }
+
+protected:
+    void exec()
+    {
+        with(*_entity) {
+            
+#line 3957 "parser.d"
+	{
+	int _klen;
+	uint _trans;
+	byte* _acts;
+	uint _nacts;
+	char* _keys;
+
+	if ( p == pe )
+		goto _test_eof;
+	if ( cs == 0 )
+		goto _out;
+_resume:
+	_keys = &_http_trailer_parser_trans_keys[_http_trailer_parser_key_offsets[cs]];
+	_trans = _http_trailer_parser_index_offsets[cs];
+
+	_klen = _http_trailer_parser_single_lengths[cs];
+	if ( _klen > 0 ) {
+		char* _lower = _keys;
+		char* _mid;
+		char* _upper = _keys + _klen - 1;
+		while (1) {
+			if ( _upper < _lower )
+				break;
+
+			_mid = _lower + ((_upper-_lower) >> 1);
+			if ( (*p) < *_mid )
+				_upper = _mid - 1;
+			else if ( (*p) > *_mid )
+				_lower = _mid + 1;
+			else {
+				_trans += (_mid - _keys);
+				goto _match;
+			}
+		}
+		_keys += _klen;
+		_trans += _klen;
+	}
+
+	_klen = _http_trailer_parser_range_lengths[cs];
+	if ( _klen > 0 ) {
+		char* _lower = _keys;
+		char* _mid;
+		char* _upper = _keys + (_klen<<1) - 2;
+		while (1) {
+			if ( _upper < _lower )
+				break;
+
+			_mid = _lower + (((_upper-_lower) >> 1) & ~1);
+			if ( (*p) < _mid[0] )
+				_upper = _mid - 2;
+			else if ( (*p) > _mid[1] )
+				_lower = _mid + 2;
+			else {
+				_trans += ((_mid - _keys)>>1);
+				goto _match;
+			}
+		}
+		_trans += _klen;
+	}
+
+_match:
+	_trans = _http_trailer_parser_indicies[_trans];
+	cs = _http_trailer_parser_trans_targs[_trans];
+
+	if ( _http_trailer_parser_trans_actions[_trans] == 0 )
+		goto _again;
+
+	_acts = &_http_trailer_parser_actions[_http_trailer_parser_trans_actions[_trans]];
+	_nacts = cast(uint) *_acts++;
+	while ( _nacts-- > 0 )
+	{
+		switch ( *_acts++ )
+		{
+	case 0:
+#line 5 "parser.rl"
+	{ mark = p; }
+	break;
+	case 1:
+#line 6 "parser.rl"
+	{ {p++; if (true) goto _out; } }
+	break;
+	case 2:
+#line 65 "parser.rl"
+	{
+        _temp1 = mark[0..p - mark];
+        mark = null;
+    }
+	break;
+	case 3:
+#line 69 "parser.rl"
+	{
+        if (_headerHandled) {
+            _headerHandled = false;
+        } else {
+            char[] fieldValue = mark[0..p - mark];
+            unfold(fieldValue);
+            string* value = _temp1 in extension;
+            if (value is null) {
+                extension[_temp1] = fieldValue;
+            } else {
+                *value ~= ", " ~ fieldValue;
+            }
+            //    fgoto *http_request_parser_error;
+            mark = null;
+        }
+    }
+	break;
+	case 4:
+#line 95 "parser.rl"
+	{
+        *_ulong = to!(ulong)(mark[0..p - mark]);
+        mark = null;
+    }
+	break;
+	case 5:
+#line 151 "parser.rl"
+	{
+        _headerHandled = true;
+        _ulong = &contentLength;
+    }
+	break;
+#line 4079 "parser.d"
+		default: break;
+		}
+	}
+
+_again:
+	if ( cs == 0 )
+		goto _out;
+	if ( ++p != pe )
+		goto _resume;
+	_test_eof: {}
+	_out: {}
+	}
+#line 619 "parser.rl"
+        }
+    }
+
+public:
+    this(ref EntityHeaders entity)
+    {
+        _entity = &entity;
+    }
+        
+    bool complete()
+    {
+        return cs >= http_trailer_parser_first_final;
+    }
+
+    bool error()
+    {
+        return cs == http_trailer_parser_error;
+    }
+
+private:    
+    EntityHeaders* _entity;
     bool _headerHandled;
     string _temp1;
     string _temp2;

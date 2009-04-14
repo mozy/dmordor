@@ -72,9 +72,9 @@
         } else {
             char[] fieldValue = mark[0..fpc - mark];
             unfold(fieldValue);
-            string* value = _temp1 in entity.extension;
+            string* value = _temp1 in extension;
             if (value is null) {
-                entity.extension[_temp1] = fieldValue;
+                extension[_temp1] = fieldValue;
             } else {
                 *value ~= ", " ~ fieldValue;
             }
@@ -150,7 +150,7 @@
     
     action set_content_length {
         _headerHandled = true;
-        _ulong = &entity.contentLength;
+        _ulong = &contentLength;
     }
     
     Content_Length = 'Content-Length:' @set_content_length LWS* DIGIT+ >mark %save_ulong LWS*;

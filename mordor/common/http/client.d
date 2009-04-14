@@ -40,7 +40,28 @@ class ClientConnection : Connection
             assert(requestLine.uri.length > 0);
             // Host header required with HTTP/1.1
             assert(request.host.length > 0 || requestLine.ver != Version(1, 1));
-            // TODO: assert(contentLength == ~0 if Transfer-Encoding is not empty);
+            // If any transfer encodings, must include chunked, must have chunked only once, and must be the last one
+            if (general.transferEncoding.length > 0) {
+                assert(general.transferEncoding[$-1].value == "chunked");
+                foreach(tc; general.transferEncoding[0..$-1]) {
+                    // Only the last one can be chunked
+                    assert(tc.value != "chunked");
+                    // identity is only acceptable in the TE header field
+                    assert(tc.value != "identity");
+                    switch (tc.value) {
+                        case "gzip":
+                        case "x-gzip":
+                        case "deflate":
+                            // Known Transfer-Codings
+                            break;
+                        case "compress":
+                        case "x-compress":
+                        default:
+                            // Unknown/unsupported Transfer-Codings
+                            assert(false);
+                    }
+                }
+            }
         }
     }
     body
@@ -170,7 +191,7 @@ private:
     {
         synchronized (_pendingResponses) {
             auto it = _pendingResponses.begin;
-            assert(it.val._fiber == Fiber.getThis);
+            //assert(it.val == this);
             it = _pendingResponses.erase(it);
             if (it != _pendingResponses.end) {
                 if (it.val in _waitingResponses) {
@@ -210,8 +231,13 @@ public:
         if (_requestStream !is null)
             return _requestStream;
         with (_request) {
-            return _requestStream = _conn.getStream(general, entity, requestLine.method, Status.init, &requestDone);
+            return _requestStream = _conn.getStream(general, entity, requestLine.method, Status.init, &requestDone, false);
         }
+    }
+    EntityHeaders* requestTrailer()
+    {
+        assert(_request.general.transferEncoding.length > 0);
+        return &_requestTrailer;
     }
     /*
     Multipart requestMultipart();
@@ -229,7 +255,7 @@ public:
             return _responseStream;
         ensureResponse();
         with (_response) {
-            return _responseStream = _conn.getStream(general, entity, _request.requestLine.method, status.status, &responseDone);
+            return _responseStream = _conn.getStream(general, entity, _request.requestLine.method, status.status, &responseDone, true);
         }
     }
 
@@ -333,8 +359,36 @@ private:
             } else {
                 throw new Exception("Unrecognized HTTP server version.");
             }
+            // Remove identity from the Transfer-Encodings
+            for (size_t i = 0; i < general.transferEncoding.length; ++i) {
+                if (general.transferEncoding[i].value == "identity") {
+                    general.transferEncoding[i..$-1] = general.transferEncoding[i+1..$];
+                    general.transferEncoding.length = general.transferEncoding.length - 1;
+                    --i;
+                }
+            }
+            if (general.transferEncoding.length > 0) {
+                if (general.transferEncoding[$-1].value != "chunked") {
+                    throw new Exception("The last transfer-encoding is not chunked.");
+                }
+                foreach (tc; general.transferEncoding[0..$-1]) {
+                    switch(tc.value) {
+                        case "chunked":
+                            throw new Exception("chunked transfer-coding applied multiple times");
+                        case "deflate":
+                        case "gzip":
+                        case "x-gzip":
+                            break;
+                        case "compress":
+                        case "x-compress":
+                            throw new Exception("compress transfer-coding is unsupported");
+                        default:
+                            throw new Exception("Unrecognized transfer-coding: " ~ tc.value);
+                    }                    
+                }
+            }
         }
-        
+
         if (close) {
             synchronized (_conn._pendingRequests) synchronized (_conn._pendingResponses) {
                 _conn._requestException = new Exception("No more requests are possible because the server voluntarily closed the connection");
@@ -368,14 +422,48 @@ private:
     
     void requestDone()
     {
-        // TODO: write the trailer, if required
+        if (_request.general.transferEncoding.length > 0) {
+            string trailerString = _requestTrailer.toString() ~ "\r\n";
+            if (trailerString != "\r\n")
+                _log.info("Trailer: {}", trailerString);
+            _conn._stream.write(trailerString);
+        }
         _conn.scheduleNextRequest();
     }
     
     void responseDone()
     {
+        if (_response.general.transferEncoding.length > 0) {
+            // Read and parse the trailer
+            scope parser = new TrailerParser(_responseTrailer);
+            parser.init();
+            scope buffer = new Buffer();
+            while (!parser.complete && !parser.error) {
+                // TODO: limit total amount read
+                size_t read = _conn._readStream.read(buffer, 65536);
+                if (read == 0) {
+                    parser.run([], true);
+                } else {
+                    void[][] bufs = buffer.readBufs;
+                    while (bufs.length > 0) {
+                        size_t consumed = parser.run(cast(char[])bufs[0], false);
+                        buffer.consume(consumed);
+                        if (parser.complete || parser.error)
+                            break;
+                        bufs = bufs[1..$];
+                    }
+                }
+            }
+            _conn._readStream.unread(buffer, buffer.readAvailable);
+            buffer.clear();
+            if (parser.error) {
+                throw new Exception("Error parsing trailer");
+            }
+            string trailerString = _responseTrailer.toString();
+            if (trailerString.length > 0)
+                _log.info("Got trailer: {}", trailerString);
+        }
         _responseDone = true;
-        // TODO: read the trailer, if possible
         _conn.scheduleNextResponse();
     }
 
