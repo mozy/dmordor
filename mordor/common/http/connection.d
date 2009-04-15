@@ -4,12 +4,12 @@ import mordor.common.http.chunked;
 import mordor.common.http.parser;
 import mordor.common.scheduler;
 import mordor.common.streams.buffered;
-import mordor.common.streams.deflate;
 import mordor.common.streams.duplex;
 import mordor.common.streams.gzip;
 import mordor.common.streams.limited;
 import mordor.common.streams.notify;
 import mordor.common.streams.singleplex;
+import mordor.common.streams.zlib;
 
 package abstract class Connection
 {
@@ -97,7 +97,7 @@ protected:
                     stream = notify;
                     break;
                 case "deflate":
-                    stream = new DeflateStream(stream);
+                    stream = new ZlibStream(stream);
                     break;
                 case "gzip":
                 case "x-gzip":
