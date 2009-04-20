@@ -1,0 +1,139 @@
+commit 18d1f383b0f6c4f733753da87a2f4052c8a79680
+Author: Cody Cutrer <cody@mozy.com>
+Date:   Fri Apr 17 13:17:04 2009 -0600
+
+    x64 assembly impl for fibers.
+    
+    Save only callee-saved registers in fiber context; include FPU and SSE callee-saved control registers, also.
+
+diff --git a/lib/common/tango/core/Thread.d b/lib/common/tango/core/Thread.d
+index d0e1433..305b187 100644
+--- a/lib/common/tango/core/Thread.d
++++ b/lib/common/tango/core/Thread.d
+@@ -2382,7 +2382,7 @@ private
+     {
+         version( X86_64 )
+         {
+-
++            // Shouldn't an x64 compiler be setting D_InlineAsm_X86_64 instead?
+         }
+         else
+         {
+@@ -2392,6 +2392,11 @@ private
+                 version = AsmX86_Posix;
+         }
+     }
++    else version( D_InlineAsm_X86_64 )
++    {
++        version( Posix )
++            version = AsmX86_64_Posix;
++    }
+     else version( PPC )
+     {
+         version( Posix )
+@@ -2418,11 +2423,10 @@ private
+ 
+         version( AsmX86_Win32 ) {} else
+         version( AsmX86_Posix ) {} else
++        version( AsmX86_64_Posix ) {} else
+         version( AsmPPC_Posix ) {} else
+         version( LLVM_AsmX86_Win32 ) {} else
+         version( LLVM_AsmX86_Posix ) {} else
+-//TODO: Enable when x86-64 Posix supports fibers
+-//        version( LLVM_AsmX86_64_Posix ) {} else
+         {
+             // NOTE: The ucontext implementation requires architecture specific
+             //       data definitions to operate so testing for it must be done
+@@ -2575,6 +2579,48 @@ private
+                 ret;
+             }
+         }
++        version( AsmX86_64_Posix )
++        {
++            asm
++            {
++                naked;
++
++                // save current stack state
++                pushq RBP;
++                mov RBP, RSP;
++                pushq RBX;
++                pushq R12;
++                pushq R13;
++                pushq R14;
++                pushq R15;
++                sub RSP, 4;
++                stmxcsr [RSP];
++                sub RSP, 4;
++                fstcw [RSP];
++                fwait;
++
++                // store oldp again with more accurate address
++                mov [RDI], RSP;
++                // load newp to begin context switch
++                mov RSP, RSI;
++
++                // load saved state from new stack
++                fldcw [RSP];
++                add RSP, 4;
++                ldmxcsr [RSP];
++                add RSP, 4;
++                popq R15;
++                popq R14;
++                popq R13;
++                popq R12;
++
++                popq RBX;
++                popq RBP;
++
++                // 'return' to complete switch
++                ret;
++            }
++        }
+         else version( LLVM_AsmX86_Posix )
+         {
+             asm
+@@ -2591,12 +2637,6 @@ private
+                 mov ESP, newp;
+             }
+         }
+-/+
+-        version( LLVM_AsmX86_64_Posix )
+-        {
+-            //TODO: Fiber implementation here
+-        }
+-+/
+         else static if( is( ucontext_t ) )
+         {
+             Fiber   cfib = Fiber.getThis();
+@@ -3337,6 +3377,17 @@ private:
+             push( 0x00000000 );                                     // ESI
+             push( 0x00000000 );                                     // EDI
+         }
++        else version( AsmX86_64_Posix )
++        {
++            push( cast(size_t) &fiber_entryPoint );                 // RIP
++            push( (cast(size_t)pstack)+8 );                         // RBP
++            push( 0x00000000_00000000 );                            // RBX
++            push( 0x00000000_00000000 );                            // R12
++            push( 0x00000000_00000000 );                            // R13
++            push( 0x00000000_00000000 );                            // R14
++            push( 0x00000000_00000000 );                            // R15
++            push( 0x00001f80_01df0000 );                            // MXCSR (32 bits), x87 control (16 bits), (unused)
++        }
+         else version( LLVM_AsmX86_Posix )
+         {
+             push( 0x00000000 );                                     // strange pre EIP
+@@ -3348,12 +3399,6 @@ private:
+             push( 0x00000000 );                                     // ESI
+             push( 0x00000000 );                                     // EDI
+         }
+-//TODO: Implement x86-64 fibers
+-/+
+-        else version( LLVM_AsmX86_Posix )
+-        {
+-        }
+-+/
+         else version( AsmPPC_Posix )
+         {
+             version( StackGrowsDown )
