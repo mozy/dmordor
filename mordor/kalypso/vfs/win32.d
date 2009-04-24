@@ -363,7 +363,7 @@ class Win32VFS : IVFS, IWatchableVFS
     {
         switch (property) {
             case "name":
-                return Variant(cast(string)"win32");
+                return Variant("win32");
             case "type":
                 return Variant("vfs");
             default:
