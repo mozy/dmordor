@@ -2,6 +2,8 @@ module mordor.common.ragel;
 
 import tango.core.Exception;
 
+import mordor.common.streams.buffered;
+
 class RagelException : Exception
 {
     this(char[] msg)
@@ -30,6 +32,31 @@ class RagelParser
         } else {
             init();
         }
+    }
+    
+    void run(Stream stream)
+    {
+        init();
+        scope buffer = new Buffer();
+        while (!complete && !error) {
+            // TODO: limit total amount read
+            size_t read = stream.read(buffer, 65536);
+            if (read == 0) {
+                run([], true);
+            } else {
+                void[][] bufs = buffer.readBufs;
+                while (bufs.length > 0) {
+                    size_t consumed = run(cast(char[])bufs[0], false);
+                    buffer.consume(consumed);
+                    if (complete || error)
+                        break;
+                    bufs = bufs[1..$];
+                }
+            }
+        }
+        auto buffered = cast(BufferedStream)stream;
+        if (buffered !is null)
+            buffered.unread(buffer, buffer.readAvailable);
     }
     
     // Partial parsing
@@ -93,4 +120,24 @@ protected:
     int cs;
     char* p, pe, eof, mark;
     char[] fullString;
+}
+
+class RagelParserWithStack : RagelParser
+{
+protected:
+    void prepush() {
+        if (stack.length == 0)
+            stack.length = 1;
+        if (top >= stack.length)
+            stack.length = stack.length * 2;
+    }
+    
+    void postpop() {
+        if (top <= stack.length / 4)
+            stack.length = stack.length /2 ;
+    }
+protected:
+    // Ragel state
+    int[] stack;
+    int top;
 }

@@ -323,30 +323,11 @@ private:
         _log.trace("Reading response headers ({})", cast(void*)this);
         // Read and parse headers
         scope parser = new ResponseParser(_response);
-        parser.init();
-        scope buffer = new Buffer();
-        while (!parser.complete && !parser.error) {
-            // TODO: limit total amount read
-            size_t read = _conn._readStream.read(buffer, 65536);
-            if (read == 0) {
-                parser.run([], true);
-            } else {
-                void[][] bufs = buffer.readBufs;
-                while (bufs.length > 0) {
-                    size_t consumed = parser.run(cast(char[])bufs[0], false);
-                    _log.trace("parser consumed '{}'", (cast(char[])bufs[0])[0..consumed]);
-                    buffer.consume(consumed);
-                    if (parser.complete || parser.error)
-                        break;
-                    bufs = bufs[1..$];
-                }
-            }
-        }
-        _conn._readStream.unread(buffer, buffer.readAvailable);
-        buffer.clear();
+        parser.run(_conn._readStream);
         if (parser.error) {
             throw new Exception("Error parsing response");
         }
+        assert(parser.complete);
         _log.info("Got response {}", _response.toString());
         bool close;
         with (_response) {
