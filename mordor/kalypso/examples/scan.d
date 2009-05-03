@@ -8,12 +8,14 @@ import tango.io.Stdout;
 
 import mordor.common.config;
 import mordor.common.exception;
+import mordor.common.iomanager;
 import mordor.common.log;
 import mordor.common.stringutils;
 import mordor.kalypso.vfs.helpers;
 import mordor.kalypso.vfs.manager;
+import mordor.kalypso.vfs.triton;
 
-void main()
+void main(string[] args)
 {
     Config.loadFromEnvironment();
     Log.root.add(new AppendConsole());
@@ -64,7 +66,7 @@ void main()
         if (++*count % 1000 == 0) {
             Stdout.formatln("{} {}(s)", *count, type);
         }
-        if (level >= 1)
+        if (level >= 8)
             return;
         try {
             foreach (child; &object.children) {
@@ -75,9 +77,19 @@ void main()
         }
     }
     
-    foreach(vfs; VFSManager.get) {
-        recurse(vfs, 0);        
+    IOManager ioManager = new IOManager();
+        
+    TritonVFS.get.registerContainer("barbara-at-barbarastogner.com@mozy.test", 162958);
+    
+    if (args.length > 1) {
+        IObject obj = VFSManager.get.find(args[1]);
+        recurse(obj, 0);
+    } else {
+        foreach(vfs; VFSManager.get) {
+            recurse(vfs, 0);        
+        }
     }
+
     foreach(t, c; counts) {
         Stdout.formatln("{} {}(s)", c, t);
     }
