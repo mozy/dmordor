@@ -9,7 +9,6 @@ import mordor.common.stringutils;
 
 interface IVFS : IObject
 {
-    IObject find(string path);
 }
 
 interface ISnapshottableVFS : IVFS
@@ -35,6 +34,7 @@ interface IObject
     void _delete();
     Stream open();
     IObject create(Variant[string] properties, bool okIfExists = true, Stream* stream = null);
+    IObject find(string path);
 }
 
 interface IVersionedObject : IObject

@@ -18,7 +18,11 @@ import mordor.common.streams.file;
 import mordor.common.streams.stream;
 import mordor.common.stringutils;
 import mordor.kalypso.vfs.helpers;
+version (rebuild) {
+    
+} else {
 version (linux) import mordor.kalypso.vfs.inotify;
+}
 import mordor.kalypso.vfs.model;
 
 // helper functions
