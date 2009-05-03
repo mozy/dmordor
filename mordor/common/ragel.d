@@ -20,7 +20,7 @@ class RagelParser
         init();
         p = str.ptr;
         pe = p + str.length;
-        pe = eof;
+        eof = pe;
 
         exec();
 

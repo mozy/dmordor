@@ -1,0 +1,38 @@
+digraph http_response_parser {
+	rankdir=LR;
+	node [ shape = point ];
+	ENTRY;
+	node [ shape = circle, height = 0.2 ];
+	node [ fixedsize = true, height = 0.65, shape = doublecircle ];
+	21;
+	node [ shape = circle ];
+	1 -> 2 [ label = "'H' / mark" ];
+	2 -> 3 [ label = "'T'" ];
+	3 -> 4 [ label = "'T'" ];
+	4 -> 5 [ label = "'P'" ];
+	5 -> 6 [ label = "'/'" ];
+	6 -> 7 [ label = "'0'..'9'" ];
+	7 -> 8 [ label = "'.'" ];
+	7 -> 7 [ label = "'0'..'9'" ];
+	8 -> 9 [ label = "'0'..'9'" ];
+	9 -> 10 [ label = "SP / parse_HTTP_Version" ];
+	9 -> 9 [ label = "'0'..'9'" ];
+	10 -> 11 [ label = "'0'..'9' / mark" ];
+	11 -> 12 [ label = "'0'..'9'" ];
+	12 -> 13 [ label = "'0'..'9'" ];
+	13 -> 14 [ label = "SP / parse_Status_Code" ];
+	14 -> 15 [ label = "-128..-1, '\\t', SP..'~' / mark" ];
+	14 -> 16 [ label = "'\\n' / mark, parse_Reason_Phrase" ];
+	14 -> 20 [ label = "'\\r' / mark, parse_Reason_Phrase" ];
+	15 -> 15 [ label = "-128..-1, '\\t', SP..'~'" ];
+	15 -> 16 [ label = "'\\n' / parse_Reason_Phrase" ];
+	15 -> 20 [ label = "'\\r' / parse_Reason_Phrase" ];
+	16 -> 17 [ label = "'\\n'" ];
+	16 -> 19 [ label = "'\\r'" ];
+	17 -> 21 [ label = "'\\n' / done" ];
+	17 -> 18 [ label = "'\\r'" ];
+	18 -> 21 [ label = "'\\n' / done" ];
+	19 -> 17 [ label = "'\\n'" ];
+	20 -> 16 [ label = "'\\n'" ];
+	ENTRY -> 1 [ label = "IN" ];
+}
