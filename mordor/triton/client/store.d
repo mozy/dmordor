@@ -59,28 +59,18 @@ body
     return 0;
 }
 
-int main(string[] args)
+void main(string[] args)
 {
     Config.loadFromEnvironment();
     Log.root.add(new AppendConsole());
     enableLoggers();
 
     IOManager ioManager = new IOManager(1);
-    int ret = 1;
+
+    AsyncSocket socket = new AsyncSocket(ioManager, AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
+    socket.connect(new InternetAddress(args[1], to!(int)(args[2])));
+    Stream tds = bufferReadStream(new SocketStream(socket));
+    Stream object = new FileStream(args[3]);
     
-    ioManager.schedule(new Fiber(delegate void() {
-        scope (exit) ioManager.stop();
-        
-        AsyncSocket socket = new AsyncSocket(ioManager, AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
-        socket.connect(new InternetAddress(args[1], to!(int)(args[2])));
-        Stream tds = bufferReadStream(new SocketStream(socket));
-        Stream object = new FileStream(args[3]);
-        
-        store(tds, args[4], object);
-        
-        ret = 0;
-    }));
-    
-    ioManager.start(true);
-    return ret;
+    store(tds, args[4], object);
 }

@@ -2,10 +2,11 @@ module mordor.common.scheduler;
 
 import tango.core.Atomic;
 public import tango.core.Thread;
-import tango.core.sync.Condition;
+import tango.core.sync.Semaphore;
 import tango.util.log.Log;
 
 import mordor.common.containers.linkedlist;
+
 
 class ThreadPool
 {
@@ -17,21 +18,12 @@ public:
         _threads = new Thread[threads];
     }
 
-    void start(bool useCaller)
+    void start()
     {
         foreach (i, t; _threads) {
-            if (useCaller && i == 0) {
-                t = Thread.getThis;
-                t.name = _name;
-                continue;
-            }
             t = new Thread(_proc);
             t.name = _name;
             t.start();
-        }
-
-        if (useCaller) {
-            _proc();
         }
     }
 
@@ -71,28 +63,36 @@ public:
     static this()
     {
         t_scheduler = new ThreadLocal!(Scheduler)();
+        t_fiber = new ThreadLocal!(Fiber)();
         _log = Log.lookup("mordor.common.scheduler");
     }
 
-    this(char[] name, int threads = 1)
+    this(char[] name, int threads = 1, bool useCaller = true)
+    in
+    {
+        if (useCaller)
+            assert(threads >= 1);
+    }
+    body
     {
         _fibers = new LinkedList!(Fiber)();
+        if (useCaller) {
+            --threads;
+            assert(getThis() is null, "Only one scheduler is allowed to be associated with any thread");
+            Thread.getThis().name = name;
+            t_scheduler.val = this;
+            t_fiber.val = new Fiber(&run, 8192);
+        }
         _threads = new ThreadPool(name, &run, threads);
+        _threads.start();
     }
 
     static Scheduler
     getThis()
     {
-        assert(t_scheduler.val);
         return t_scheduler.val;
     }
 
-    void start(bool useCaller = false)
-    {
-        atomicStore(_stopping, false);
-        _threads.start(useCaller);
-    }
-    
     void stop()
     {
         atomicStore(_stopping, true);
@@ -119,14 +119,30 @@ public:
     }
 
     void switchTo()
+    in
     {
-        if (_threads.contains(Thread.getThis)) {
+        assert(Scheduler.getThis() !is null);
+    }
+    body
+    {
+        if (Scheduler.getThis() == this) {
             _log.trace("Skipping switch to scheduler {} because we're already on thread {}",
                 _threads.name, cast(void*)Thread.getThis);
             return;
         }
-        schedule(Fiber.getThis);
-        Fiber.yield();
+        schedule(Fiber.getThis());
+        Scheduler.getThis().yieldTo();
+    }
+
+    void yieldTo()
+    in
+    {
+        assert(t_fiber.val);
+        assert(Scheduler.getThis() is this);
+    }
+    body
+    {
+        t_fiber.val.yieldTo();
     }
 
     ThreadPool
@@ -148,24 +164,30 @@ private:
     run()
     {
         t_scheduler.val = this;
+        t_fiber.val = Fiber.getThis();
         Fiber idleFiber = new Fiber(&idle);
         _log.trace("Starting thread {} in scheduler {}", cast(void*)Thread.getThis, _threads.name);
         while (true) {
             Fiber f;
             synchronized (_fibers) {
-                for (auto it = _fibers.begin; it != _fibers.end; ++it) {
-                    f = it.val;
-                    if (f.state == Fiber.State.EXEC) {
-                        continue;
+                while (f is null) {
+                    if (_fibers.empty())
+                        break;
+                    for (auto it = _fibers.begin; it != _fibers.end; ++it) {
+                        f = it.val;
+                        if (f.state == Fiber.State.EXEC) {
+                            f = null;
+                            continue;
+                        }
+                        _fibers.erase(it);
+                        break;
                     }
-                    _fibers.erase(it);
-                    break;
                 }
             }
             if (f) {
                 if (f.state != Fiber.State.TERM) {
                     _log.trace("Calling fiber {} on thread {} in scheduler {}", cast(void*)f, cast(void*)Thread.getThis, _threads.name);
-                    f.call();
+                    f.yieldTo();
                     _log.trace("Returning from fiber {} on thread {} in scheduler {}", cast(void*)f, cast(void*)Thread.getThis, _threads.name);
                 }
                 continue;
@@ -183,6 +205,7 @@ private:
 private:
 
     static ThreadLocal!(Scheduler) t_scheduler;
+    static ThreadLocal!(Fiber)     t_fiber;
     ThreadPool                     _threads;
     LinkedList!(Fiber)             _fibers;
     bool                           _stopping;
@@ -192,11 +215,10 @@ private:
 class WorkerPool : Scheduler
 {
 public:
-    this(char[] name, int threads = 1)
+    this(char[] name, int threads = 1, bool useCaller = true)
     {
-        _mutex = new Mutex();
-        _cond = new Condition(_mutex);
-        super(name, threads);
+        _semaphore = new Semaphore();
+        super(name, threads, useCaller);
     }
 
 protected:
@@ -206,31 +228,27 @@ protected:
             if (stopping) {
                 return;
             }
-            synchronized(_mutex) {
-                _cond.wait();
-            }
+            _semaphore.wait();
             Fiber.yield();
         }
     }
     void tickle()
     {
-        synchronized(_mutex) {
-            _cond.notify();
-        }
+        _semaphore.notify();
     }
 
 private:
-    Mutex     _mutex;
-    Condition _cond;
+    Semaphore _semaphore;
 }
 
 void
-parallel_do(void delegate()[] dgs ...) {
-    size_t executed = 0;
+parallel_do(void delegate()[] dgs ...)
+{
     size_t completed = 0;
-    Fiber current = Fiber.getThis;
+    Scheduler scheduler = Scheduler.getThis();
+    Fiber caller = Fiber.getThis();
     
-    if (current is null) {
+    if (scheduler is null) {
         foreach(dg; dgs) {
             dg();
         }
@@ -239,16 +257,18 @@ parallel_do(void delegate()[] dgs ...) {
 
     foreach(dg; dgs) {
         Fiber f = new Fiber(delegate void() {
-            // can't use dg(), because this doesn't get executed until
-            // the Fiber.yield() below, and dg will be out of scope
-            dgs[atomicIncrement(executed) - 1]();
+            auto localdg = dg;
+            Fiber.yield();
+            localdg();
             if (atomicIncrement(completed) == dgs.length) {
-                Scheduler.getThis.schedule(current);
+                scheduler.schedule(caller);
             }
         });
-        Scheduler.getThis.schedule(f);
+        // Give the fiber a chance to copy state to local stack
+        f.call();
+        scheduler.schedule(f);
     }
-    Fiber.yield();
+    scheduler.yieldTo();
 }
 
 struct Aggregator(T) {

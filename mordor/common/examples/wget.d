@@ -24,25 +24,19 @@ void main(string[] args)
 
     IOManager ioManager = new IOManager();
 
-    ioManager.schedule(new Fiber(delegate void() {
-        AsyncSocket s = new AsyncSocket(ioManager, AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
-        s.connect(new InternetAddress(args[1], to!(int)(args[2])));
-        SocketStream stream = new SocketStream(s);
-        
-        scope conn = new ClientConnection(stream);
-        Request requestHeaders;
-        requestHeaders.requestLine.uri = args[3];
-        requestHeaders.general.connection = new StringSet;
-        requestHeaders.general.connection.insert("close");
-        if (args.length > 4)
-            requestHeaders.request.host = args[4];
-        auto request = conn.request(requestHeaders);
-        scope (failure) request.abort();
-        scope stdout = new StdoutStream();
-        transferStream(request.responseStream, stdout);
+    AsyncSocket s = new AsyncSocket(ioManager, AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
+    s.connect(new InternetAddress(args[1], to!(int)(args[2])));
+    SocketStream stream = new SocketStream(s);
 
-        ioManager.stop();
-    }, 128 * 1024));
-
-    ioManager.start(true);
+    scope conn = new ClientConnection(stream);
+    Request requestHeaders;
+    requestHeaders.requestLine.uri = args[3];
+    requestHeaders.general.connection = new StringSet;
+    requestHeaders.general.connection.insert("close");
+    if (args.length > 4)
+        requestHeaders.request.host = args[4];
+    auto request = conn.request(requestHeaders);
+    scope (failure) request.abort();
+    scope stdout = new StdoutStream();
+    transferStream(request.responseStream, stdout);
 }

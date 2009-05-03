@@ -10,19 +10,15 @@ void main(char[][])
 {
     IOManager ioManager = new IOManager(5);
 
-    ioManager.schedule(new Fiber(delegate void() {
-        Socket s = new AsyncSocket(ioManager, AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
-        s.bind(new InternetAddress("127.0.0.1", 8000));
-        s.listen(10);
+    Socket s = new AsyncSocket(ioManager, AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
+    s.bind(new InternetAddress("127.0.0.1", 8000));
+    s.listen(10);
 
-        while(true) {
-            Socket newsocket = s.accept();
-            Connection newconn = new Connection(newsocket);
-            Scheduler.getThis.schedule(new Fiber(&newconn.run));
-        }
-    }));
-
-    ioManager.start(true);
+    while(true) {
+        Socket newsocket = s.accept();
+        Connection newconn = new Connection(newsocket);
+        ioManager.schedule(new Fiber(&newconn.run));
+    }
 }
 
 class Connection
@@ -35,6 +31,7 @@ public:
 
     void run()
     {
+        scope (exit) Scheduler.getThis().yieldTo();
         while(true) {
             Stdout.formatln("starting a new read");
             void[] buffer = new void[4096];

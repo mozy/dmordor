@@ -95,7 +95,7 @@ public:
                 _log.trace("Read from handle {} failed with code {}", _hFile, GetLastError());
                 throw exceptionFromLastError();
             }
-            Fiber.yield();
+            Scheduler.getThis().yieldTo();
             if (!_readEvent.ret && (_readEvent.lastError == ERROR_HANDLE_EOF ||
                 _readEvent.lastError == ERROR_BROKEN_PIPE)) {
                 return 0;
@@ -145,7 +145,7 @@ public:
                 _log.trace("Write to handle {} failed with code {}", _hFile, GetLastError());
                 throw exceptionFromLastError();
             }
-            Fiber.yield();
+            Scheduler.getThis().yieldTo();
             if (!_writeEvent.ret) {
                 _log.trace("Async write to handle {} failed with code {}", _hFile, _writeEvent.lastError);
                 throw exceptionFromLastError(_writeEvent.lastError);

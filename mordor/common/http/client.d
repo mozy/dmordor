@@ -100,7 +100,6 @@ class ClientConnection : Connection
                 }
             }
         }
-        
         auto request = new ClientRequest(this, requestHeaders);
 
         bool firstRequest;
@@ -122,7 +121,7 @@ class ClientConnection : Connection
         // If we weren't the first request in the queue, we have to wait for
         // another request to schedule us
         if (!firstRequest) {
-            Fiber.yield();
+            Scheduler.getThis().yieldTo();
             synchronized (_pendingRequests) {
                 if (_requestException !is null)
                     throw _requestException;
@@ -156,6 +155,13 @@ class ClientConnection : Connection
             }
         }
         return request;
+    }
+    
+    size_t requestDepth() {
+        synchronized (_pendingRequests) return _pendingRequests.size();
+    }
+    size_t responseDepth() {
+        synchronized (_pendingResponses) return _pendingResponses.size();
     }
     
 private:
@@ -314,7 +320,7 @@ private:
         // If we weren't the first response in the queue, wait for someone else to schedule us
         if (wait) {
             _log.trace("Yielding response {}", this);
-            Fiber.yield();
+            Scheduler.getThis().yieldTo();
             synchronized (_conn._pendingResponses) {
                 if (_conn._responseException !is null)
                     throw _conn._responseException;

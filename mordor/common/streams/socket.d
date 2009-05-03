@@ -2,7 +2,6 @@ module mordor.common.streams.socket;
 
 import tango.net.Socket;
 import tango.util.log.Log;
-
 import mordor.common.exception;
 public import mordor.common.streams.stream;
 
@@ -64,7 +63,9 @@ public:
 
     size_t write(Buffer b, size_t len)
     {
+        _log.trace("Sending {} to socket {}", len, cast(void*)_s);
         int rc = _s.send(b.readBufs(len));
+        _log.trace("Sent {} to socket {}", rc, cast(void*)_s);
         if (rc == 0) {
             throw new ZeroLengthWriteException();
         } else if (rc < 0) {

@@ -19,21 +19,21 @@ void main(string[] args)
 
     Stream stdout = new StdoutStream;
     
-    WorkerPool pool = new WorkerPool("pool", 1);
+    WorkerPool mainpool = new WorkerPool("main");
+    WorkerPool pool = new WorkerPool("pool", 2, false);
+    pool.switchTo();
 
-    pool.schedule(new Fiber(delegate void() {
-        if (args.length == 1)
-            args ~= "-";
-        foreach(string arg; args[1..$]) {
-            Stream inStream;
-            if (arg == "-")
-                inStream = new StdinStream;
-            else
-                inStream = new FileStream(arg, FileStream.Flags.READ);
+    if (args.length == 1)
+        args ~= "-";
+    foreach(string arg; args[1..$]) {
+        Stream inStream;
+        if (arg == "-")
+            inStream = new StdinStream;
+        else
+            inStream = new FileStream(arg, FileStream.Flags.READ);
 
-            transferStream(inStream, stdout);
-        }
-        pool.stop();
-    }));
-    pool.start(true);
+        transferStream(inStream, stdout);
+    }
+    mainpool.switchTo();
+    pool.stop();
 }

@@ -91,7 +91,7 @@ version (Windows) {
     import tango.stdc.errno;
     version (epoll) import tango.sys.linux.epoll;
 }
-
+extern (C) int printf(char* format, ...);
 class AsyncSocket : Socket
 {
 public:
@@ -159,7 +159,7 @@ public:
                     exception("Unable to connect socket: ");
                 }
             }
-            Fiber.yield();
+            Scheduler.getThis().yieldTo();
             if (!m_writeEvent.ret) {
                 SetLastError(m_writeEvent.lastError);
                 exception("Unable to connect socket: ");
@@ -170,7 +170,7 @@ public:
             super.connect(to);
             if (errno == EINPROGRESS) {
                 _ioManager.registerEvent(&m_writeEvent);
-                Fiber.yield();
+                Scheduler.getThis().yieldTo();
                 int err;
                 getOption(SocketOptionLevel.SOCKET, SocketOption.SO_ERROR, (cast(void*)&err)[0..int.sizeof]);
                 if (err != 0) {
@@ -203,7 +203,7 @@ public:
                 exception(
                     "Unable to accept socket connection");
             }
-            Fiber.yield();
+            Scheduler.getThis().yieldTo();
             if (!m_readEvent.ret && m_readEvent.lastError != ERROR_MORE_DATA) {
                 SetLastError(m_readEvent.lastError);
                 throw new SocketAcceptException(
@@ -216,7 +216,7 @@ public:
             socket_t newsock = .accept(sock, null, null);
             while (newsock == socket_t.init && errno == EAGAIN) {
                 _ioManager.registerEvent(&m_readEvent);
-                Fiber.yield();
+                Scheduler.getThis().yieldTo();
                 newsock = .accept(sock, null, null);
             }
             if (newsock == socket_t.init) {
@@ -245,7 +245,7 @@ public:
             if (ret && GetLastError() != WSA_IO_PENDING) {
                 return ret;
             }
-            Fiber.yield();
+            Scheduler.getThis().yieldTo();
             if (!m_writeEvent.ret) {
                 SetLastError(m_writeEvent.lastError);
                 return tango.net.Socket.SOCKET_ERROR;
@@ -255,7 +255,7 @@ public:
             int rc = super.send(buf, flags);
             while (rc == ERROR && errno == EAGAIN) {
                 _ioManager.registerEvent(&m_writeEvent);
-                Fiber.yield();
+                Scheduler.getThis().yieldTo();
                 rc = super.send(buf, flags);
             }
             return rc;
@@ -272,7 +272,7 @@ public:
             if (ret && GetLastError() != WSA_IO_PENDING) {
                 return ret;
             }
-            Fiber.yield();
+            Scheduler.getThis().yieldTo();
             if (!m_writeEvent.ret) {
                 SetLastError(m_writeEvent.lastError);
                 return ERROR;
@@ -282,7 +282,7 @@ public:
             int rc = super.send(bufs, flags);
             while (rc == ERROR && errno == EAGAIN) {
                 _ioManager.registerEvent(&m_writeEvent);
-                Fiber.yield();
+                Scheduler.getThis().yieldTo();
                 rc = super.send(bufs, flags);
             }
             return rc;
@@ -302,7 +302,7 @@ public:
             if (ret && GetLastError() != WSA_IO_PENDING) {
                 return ret;
             }
-            Fiber.yield();
+            Scheduler.getThis().yieldTo();
             if (!m_writeEvent.ret) {
                 SetLastError(m_writeEvent.lastError);
                 return tango.net.Socket.SOCKET_ERROR;
@@ -312,7 +312,7 @@ public:
             int rc = super.sendTo(buf, flags, to);
             while (rc == ERROR && errno == EAGAIN) {
                 _ioManager.registerEvent(&m_writeEvent);
-                Fiber.yield();
+                Scheduler.getThis().yieldTo();
                 rc = super.send(buf, flags);
             }
             return rc;
@@ -330,7 +330,7 @@ public:
             if (ret && GetLastError() != WSA_IO_PENDING) {
                 return ret;
             }
-            Fiber.yield();
+            Scheduler.getThis().yieldTo();
             if (!m_writeEvent.ret) {
                 SetLastError(m_writeEvent.lastError);
                 return tango.net.Socket.SOCKET_ERROR;
@@ -340,7 +340,7 @@ public:
             int rc = super.sendTo(bufs, flags, to);
             while (rc == ERROR && errno == EAGAIN) {
                 _ioManager.registerEvent(&m_writeEvent);
-                Fiber.yield();
+                Scheduler.getThis().yieldTo();
                 rc = super.sendTo(bufs, flags, to);
             }
             return rc;
@@ -358,7 +358,7 @@ public:
             if (ret && GetLastError() != WSA_IO_PENDING) {
                 return ret;
             }
-            Fiber.yield();
+            Scheduler.getThis().yieldTo();
             if (!m_writeEvent.ret) {
                 SetLastError(m_writeEvent.lastError);
                 return tango.net.Socket.SOCKET_ERROR;
@@ -368,7 +368,7 @@ public:
             int rc = super.sendTo(bufs, flags);
             while (rc == ERROR && errno == EAGAIN) {
                 _ioManager.registerEvent(&m_writeEvent);
-                Fiber.yield();
+                Scheduler.getThis().yieldTo();
                 rc = super.sendTo(bufs, flags);
             }
             return rc;
@@ -390,7 +390,7 @@ public:
             if (ret && GetLastError() != WSA_IO_PENDING) {
                 return ret;
             }
-            Fiber.yield();
+            Scheduler.getThis().yieldTo();
             if (!m_readEvent.ret) {
                 SetLastError(m_readEvent.lastError);
                 return ERROR;
@@ -400,7 +400,7 @@ public:
             int rc = super.receive(buf, flags);
             while (rc == ERROR && errno == EAGAIN) {
                 _ioManager.registerEvent(&m_readEvent);
-                Fiber.yield();
+                Scheduler.getThis().yieldTo();
                 rc = super.receive(buf, flags);
             }
             return rc;
@@ -420,7 +420,7 @@ public:
             if (ret && GetLastError() != WSA_IO_PENDING) {
                 return ret;
             }
-            Fiber.yield();
+            Scheduler.getThis().yieldTo();
             if (!m_readEvent.ret) {
                 SetLastError(m_readEvent.lastError);
                 return tango.net.Socket.SOCKET_ERROR;
@@ -430,7 +430,7 @@ public:
             int rc = super.receive(bufs, flags);
             while (rc == ERROR && errno == EAGAIN) {
                 _ioManager.registerEvent(&m_readEvent);
-                Fiber.yield();
+                Scheduler.getThis().yieldTo();
                 rc = super.receive(bufs, flags);
             }
             return rc;
@@ -454,7 +454,7 @@ public:
             if (ret && GetLastError() != WSA_IO_PENDING) {
                 return ret;
             }
-            Fiber.yield();
+            Scheduler.getThis().yieldTo();
             if (!m_readEvent.ret) {
                 SetLastError(m_readEvent.lastError);
                 return ERROR;
@@ -464,7 +464,7 @@ public:
             int rc = super.receiveFrom(buf, flags, from);
             while (rc == ERROR && errno == EAGAIN) {
                 _ioManager.registerEvent(&m_readEvent);
-                Fiber.yield();
+                Scheduler.getThis().yieldTo();
                 rc = super.receiveFrom(buf, flags, from);
             }
             return rc;   
@@ -483,7 +483,7 @@ public:
             if (ret && GetLastError() != WSA_IO_PENDING) {
                 return ret;
             }
-            Fiber.yield();
+            Scheduler.getThis().yieldTo();
             if (!m_readEvent.ret) {
                 SetLastError(m_readEvent.lastError);
                 return tango.net.Socket.SOCKET_ERROR;
@@ -493,7 +493,7 @@ public:
             int rc = super.receiveFrom(bufs, flags, from);
             while (rc == ERROR && errno == EAGAIN) {
                 _ioManager.registerEvent(&m_readEvent);
-                Fiber.yield();
+                Scheduler.getThis().yieldTo();
                 rc = super.receiveFrom(bufs, flags, from);
             }
             return rc;
@@ -510,7 +510,7 @@ public:
             if (ret && GetLastError() != WSA_IO_PENDING) {
                 return ret;
             }
-            Fiber.yield();
+            Scheduler.getThis().yieldTo();
             if (!m_readEvent.ret) {
                 SetLastError(m_readEvent.lastError);
                 return tango.net.Socket.SOCKET_ERROR;
@@ -520,7 +520,7 @@ public:
             int rc = super.receiveFrom(bufs, flags);
             while (rc == ERROR && errno == EAGAIN) {
                 _ioManager.registerEvent(&m_readEvent);
-                Fiber.yield();
+                Scheduler.getThis().yieldTo();
                 rc = super.receiveFrom(bufs, flags);
             }
             return rc;

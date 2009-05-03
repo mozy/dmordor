@@ -20,34 +20,30 @@ void main(string[] args)
     Log.root.add(new AppendConsole());
     enableLoggers();
         
-    WorkerPool pool = new WorkerPool("pool", 1);
+    WorkerPool pool = new WorkerPool("pool", 1, true);
 
-    pool.schedule(new Fiber(delegate void() {
-        if (args.length == 1)
-            args ~= "-";
-        foreach(string arg; args[1..$]) {
-            Stream inStream;
-            if (arg == "-")
-                inStream = new StdinStream;
-            else {
-                try {
-                    inStream = new FileStream(arg, FileStream.Flags.READ);
-                } catch (Exception ex) {
-                    Stderr.formatln("{}  {}", arg, ex);
-                    continue;
-                }
-            }
-
-            scope DigestStream digest = new DigestStream(inStream, new Sha0);
-
+    if (args.length == 1)
+        args ~= "-";
+    foreach(string arg; args[1..$]) {
+        Stream inStream;
+        if (arg == "-")
+            inStream = new StdinStream;
+        else {
             try {
-                transferStream(digest, NilStream.get);
-                Stdout.formatln("{}  {}", digest.hexDigest(), arg);
+                inStream = new FileStream(arg, FileStream.Flags.READ);
             } catch (Exception ex) {
                 Stderr.formatln("{}  {}", arg, ex);
+                continue;
             }
         }
-        pool.stop();
-    }));
-    pool.start(true);
+
+        scope DigestStream digest = new DigestStream(inStream, new Sha0);
+
+        try {
+            transferStream(digest, NilStream.get);
+            Stdout.formatln("{}  {}", digest.hexDigest(), arg);
+        } catch (Exception ex) {
+            Stderr.formatln("{}  {}", arg, ex);
+        }
+    }
 }

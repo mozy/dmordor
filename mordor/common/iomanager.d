@@ -20,10 +20,10 @@ version(Windows)
     class IOManager : Scheduler
     {
     public:
-        this(int threads = 1)
+        this(int threads = 1, bool useCaller = true)
         {
             m_hCompletionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
-            super("IOManager", threads);
+            super("IOManager", threads, useCaller);
         }
 
         void registerFile(HANDLE handle)
@@ -116,7 +116,7 @@ version(Windows)
     class IOManager : Scheduler
     {
     public:
-        this(int threads = 1)
+        this(int threads = 1, bool useCaller = true)
         {
             m_epfd = epoll_create(5000);
             pipe(m_tickleFds);
@@ -124,7 +124,7 @@ version(Windows)
             event.events = EPOLLIN;
             event.data.fd = m_tickleFds[0];
             epoll_ctl(m_epfd, EPOLL_CTL_ADD, m_tickleFds[0], &event);
-            super("IOManager", threads);
+            super("IOManager", threads, useCaller);
         }
 
         void registerEvent(AsyncEvent* e)

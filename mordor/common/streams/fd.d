@@ -82,7 +82,7 @@ public:
         int rc = readv(_fd, iov.ptr, iov.length);
         while (rc < 0 && errno == EAGAIN && _ioManager !is null) {
             _ioManager.registerEvent(&_readEvent);
-            Fiber.yield();
+            Scheduler.getThis().yieldTo();
             rc = readv(_fd, iov.ptr, iov.length);
         }
         if (rc < 0) {
@@ -98,7 +98,7 @@ public:
         int rc = writev(_fd, iov.ptr, iov.length);
         while (rc < 0 && errno == EAGAIN && _ioManager !is null) {
             _ioManager.registerEvent(&_writeEvent);
-            Fiber.yield();
+            Scheduler.getThis().yieldTo();
             rc = writev(_fd, iov.ptr, iov.length);
         }
         if (rc == 0) {

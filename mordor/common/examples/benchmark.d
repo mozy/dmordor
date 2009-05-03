@@ -21,17 +21,15 @@ void main(char[][] args)
     bool runClient = true;
 
     if (runServer) {
-        g_ioManager.schedule(new Fiber(delegate void() {
-            Socket s = new AsyncSocket(g_ioManager, AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
-            s.bind(new InternetAddress("0.0.0.0", SERVER_PORT));
-            s.listen(10);
+        Socket s = new AsyncSocket(g_ioManager, AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
+        s.bind(new InternetAddress("0.0.0.0", SERVER_PORT));
+        s.listen(10);
 
-            while(true) {
-                Socket newsocket = s.accept();
-                ServerConnection newconn = new ServerConnection(newsocket);
-                Scheduler.getThis.schedule(new Fiber(&newconn.run));
-            }
-        }));
+        while(true) {
+            Socket newsocket = s.accept();
+            ServerConnection newconn = new ServerConnection(newsocket);
+            Scheduler.getThis.schedule(new Fiber(&newconn.run));
+        }
     }
 
     if (runClient) {
@@ -40,8 +38,6 @@ void main(char[][] args)
         g_clients = new Fiber[g_totalConns];
         ClientConnection.startTest(1);
     }
-
-    g_ioManager.start(true);
 }
 
 class ServerConnection
@@ -54,7 +50,7 @@ public:
 
     void run()
     {
-        scope (exit) sock.shutdown(SocketShutdown.BOTH);
+        scope (exit) { sock.shutdown(SocketShutdown.BOTH); Scheduler.getThis.yieldTo(); }
         while(true) {
             ubyte[1] buffer;
             int rc = sock.receive(buffer);

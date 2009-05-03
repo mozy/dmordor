@@ -22,29 +22,25 @@ void main(string[] args)
     
     WorkerPool pool = new WorkerPool("pool", 1);
 
-    pool.schedule(new Fiber(delegate void() {
-        if (args.length == 1)
-            args ~= "-";
-        foreach(string arg; args[1..$]) {
-            Stream inStream;
-            if (arg == "-") {
-                inStream = new StdinStream;
-            } else {
-                try {
-                    inStream = new FileStream(arg, FileStream.Flags.READ);
-                } catch (Exception ex) {
-                    Stderr.formatln("{}  {}", arg, ex);
-                    continue;
-                }
-            }
-
+    if (args.length == 1)
+        args ~= "-";
+    foreach(string arg; args[1..$]) {
+        Stream inStream;
+        if (arg == "-") {
+            inStream = new StdinStream;
+        } else {
             try {
-                transferStream(new ZlibStream(inStream, false), stdout);
+                inStream = new FileStream(arg, FileStream.Flags.READ);
             } catch (Exception ex) {
                 Stderr.formatln("{}  {}", arg, ex);
+                continue;
             }
         }
-        pool.stop();
-    }, 64 * 1024));
-    pool.start(true);
+
+        try {
+            transferStream(new ZlibStream(inStream, false), stdout);
+        } catch (Exception ex) {
+            Stderr.formatln("{}  {}", arg, ex);
+        }
+    }
 }

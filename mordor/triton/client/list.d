@@ -4,6 +4,7 @@ import tango.util.Convert;
 
 import mordor.common.http.client;
 import mordor.common.http.parser;
+import mordor.common.http.uri;
 import mordor.common.streams.stream;
 import mordor.common.stringutils;
 import mordor.common.xml.parser;
@@ -51,8 +52,8 @@ void list(ClientConnection conn, string principal, long container,
             void delegate(string, bool) fileDg)
 {
     Request requestHeaders;
-    requestHeaders.requestLine.uri = "/rest/namedObjects?Prefix=" ~ prefix ~
-        "&Recurse=" ~ (recurse ? "1" : "0") ~ "&BeginName=" ~ beginName ~
+    requestHeaders.requestLine.uri = "/rest/namedObjects?Prefix=" ~ escapeQueryString(prefix) ~
+        "&Recurse=" ~ (recurse ? "1" : "0") ~ "&BeginName=" ~ escapeQueryString(beginName) ~
         (limit == -1 ? "" : "&Limit=" ~ to!(string)(limit)) ~
         "&IncludeVersions=" ~ (includeVersions ? "1" : "0") ~
         "&IncludeDirectories=" ~ (includeDirectories ? "1" : "0");
@@ -95,40 +96,34 @@ debug (list)
         }
     
         IOManager ioManager = new IOManager();
-    
-        ioManager.schedule(new Fiber(delegate void() {
-            AsyncSocket s = new AsyncSocket(ioManager, AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
-            s.connect(new InternetAddress(args[1], to!(int)(args[2])));
-            SocketStream stream = new SocketStream(s);
-            
-            scope conn = new ClientConnection(stream);
-            
-            string prefix;
-            bool recurse = true;
-            string beginName;
-            long limit = -1;
-            bool includeVersions = true;
-            bool includeDirectories = false;
-            if (args.length > 5)
-                prefix = args[5];
-            if (args.length > 6)
-                recurse = to!(bool)(args[6]);
-            if (args.length > 7)
-                beginName = args[7];
-            if (args.length > 8)
-                limit = to!(long)(args[8]);
-            if (args.length > 9)
-                includeVersions = to!(bool)(args[9]);
-            if (args.length > 10)
-                includeDirectories = to!(bool)(args[10]);
-            list(conn, args[3], to!(long)(args[4]), prefix, recurse, beginName, limit, includeVersions, includeDirectories,
-                delegate void(string path, bool isdir) {
-                    Stdout.formatln("File '{}' is dir {}", path, isdir);
-                });
-    
-            ioManager.stop();
-        }, 64 * 1024));
-    
-        ioManager.start(true);
+
+        AsyncSocket s = new AsyncSocket(ioManager, AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
+        s.connect(new InternetAddress(args[1], to!(int)(args[2])));
+        SocketStream stream = new SocketStream(s);
+        
+        scope conn = new ClientConnection(stream);
+        
+        string prefix;
+        bool recurse = true;
+        string beginName;
+        long limit = -1;
+        bool includeVersions = true;
+        bool includeDirectories = false;
+        if (args.length > 5)
+            prefix = args[5];
+        if (args.length > 6)
+            recurse = to!(bool)(args[6]);
+        if (args.length > 7)
+            beginName = args[7];
+        if (args.length > 8)
+            limit = to!(long)(args[8]);
+        if (args.length > 9)
+            includeVersions = to!(bool)(args[9]);
+        if (args.length > 10)
+            includeDirectories = to!(bool)(args[10]);
+        list(conn, args[3], to!(long)(args[4]), prefix, recurse, beginName, limit, includeVersions, includeDirectories,
+            delegate void(string path, bool isdir) {
+                Stdout.formatln("File '{}' is dir {}", path, isdir);
+            });
     }
 }
