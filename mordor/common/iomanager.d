@@ -294,7 +294,7 @@ version(Windows)
     class IOManager : Scheduler
     {
     public:
-        this(int threads = 1)
+        this(int threads = 1, bool useCaller = true)
         {
             m_kqfd = kqueue();
             pipe(m_tickleFds);
@@ -302,7 +302,7 @@ version(Windows)
             struct_kevent event;
             EV_SET(event, m_tickleFds[0], EVFILT_READ, EV_ADD, 0, 0, null);
             kevent(m_kqfd, &event, 1, null, 0, null);
-            super("IOManager", threads);
+            super("IOManager", threads, useCaller);
         }
 
         void registerEvent(AsyncEvent* e)
