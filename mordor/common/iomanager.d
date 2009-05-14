@@ -35,6 +35,13 @@ version(Windows)
         }
 
         void registerEvent(AsyncEvent* e)
+        in
+        {
+            assert(e);
+            assert(Scheduler.getThis);
+            assert(Fiber.getThis);
+        }
+        body
         {
             e._scheduler = Scheduler.getThis;
             e._fiber = Fiber.getThis;
@@ -68,7 +75,7 @@ version(Windows)
                     continue;
                 }
                 if (!ret && overlapped == NULL) {
-                    throw new Exception("Fail!");
+                    throw exceptionFromLastError();
                 }
                 AsyncEvent* e;
                 
@@ -110,6 +117,7 @@ version(Windows)
         Fiber _fiber;
     };
 } else version(epoll) {
+    import tango.stdc.errno;
     import tango.stdc.posix.unistd;
     import tango.sys.linux.epoll;
 
@@ -128,6 +136,13 @@ version(Windows)
         }
 
         void registerEvent(AsyncEvent* e)
+        in
+        {
+            assert(e);
+            assert(Scheduler.getThis);
+            assert(Fiber.getThis);
+        }
+        body
         {
             e.event.events &= (EPOLLIN | EPOLLOUT);
             assert(e.event.events != 0);
@@ -159,7 +174,7 @@ version(Windows)
                 int rc = epoll_ctl(m_epfd, op, (*current).event.data.fd,
                     &(*current).event);
                 if (rc != 0) {
-                    throw new Exception("Couldn't associate fd with epoll.");
+                    throw exceptionFromLastError();
                 }
             }
         }
@@ -176,11 +191,12 @@ version(Windows)
                         }
                     }
                 }
-                //Stdout.formatln("idling");
-                int rc = epoll_wait(m_epfd, events.ptr, events.length, -1);
-                //Stdout.formatln("Got {} event(s)", rc);
+                int rc = -1;
+                errno = EINTR;
+                while (rc < 0 && errno == EINTR)
+                    rc = epoll_wait(m_epfd, events.ptr, events.length, -1);
                 if (rc <= 0) {
-                    throw new Exception("Fail!");
+                    throw exceptionFromLastError();
                 }
                 
                 foreach (event; events[0..rc]) {
@@ -238,6 +254,7 @@ version(Windows)
     };
 } else version(kqueue) {
     import tango.stdc.posix.unistd;
+    import tango.stdc.errno;
     
     struct timespec {
         time_t tv_sec;
@@ -297,21 +314,31 @@ version(Windows)
         this(int threads = 1, bool useCaller = true)
         {
             m_kqfd = kqueue();
+            assert(m_kqfd > 0);
             pipe(m_tickleFds);
-            //Stdout.formatln("KQueue FD: {}, pipe fds: {} {}", m_kqfd, m_tickleFds[0], m_tickleFds[1]);
             struct_kevent event;
             EV_SET(event, m_tickleFds[0], EVFILT_READ, EV_ADD, 0, 0, null);
-            kevent(m_kqfd, &event, 1, null, 0, null);
+            int rc = kevent(m_kqfd, &event, 1, null, 0, null);
+            assert(rc == 0);
             super("IOManager", threads, useCaller);
         }
 
         void registerEvent(AsyncEvent* e)
+        in
         {
+            assert(e);
+            assert(Scheduler.getThis);
+            assert(Fiber.getThis);
+        }
+        body
+        {
+            e._scheduler = Scheduler.getThis;
+            e._fiber = Fiber.getThis;
             e.event.flags = EV_ADD;
-            e.event.udata = cast(void*)Fiber.getThis;
+            e.event.udata = cast(void*)e;
             int rc = kevent(m_kqfd, &e.event, 1, null, 0, null);
             if (rc != 0) {
-                throw new Exception("Couldn't associate kevent with kqueue.");
+                throw exceptionFromLastError();
             }
         }
 
@@ -324,11 +351,12 @@ version(Windows)
                     // TODO: dunno if we have pending events
                     return;
                 }
-                //Stdout.formatln("idling");
-                int rc = kevent(m_kqfd, null, 0, events.ptr, events.length, null);
-                //Stdout.formatln("Got {} event(s)", rc);
+                int rc = -1;
+                errno = EINTR;
+                while (rc < 0 && errno == EINTR)
+                    rc = kevent(m_kqfd, null, 0, events.ptr, events.length, null);
                 if (rc <= 0) {
-                    throw new Exception("Fail!");
+                    exceptionFromLastError();
                 }
                 
                 foreach (event; events[0..rc]) {
@@ -344,8 +372,9 @@ version(Windows)
                     if (rc != 0) {
                     }
 
-                    Fiber f = cast(Fiber)event.udata;
-                    schedule(f);
+                    auto e = cast(AsyncEvent*)event.udata;
+                    assert(e);
+                    e._scheduler.schedule(e._fiber);
                 }
 
                 Fiber.yield();
@@ -365,6 +394,8 @@ version(Windows)
     struct AsyncEvent
     {
     public:
+        Scheduler _scheduler;
+        Fiber _fiber;
         struct_kevent event;
     };
 }
