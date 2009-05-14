@@ -7,25 +7,32 @@ import mordor.kalypso.vfs.model;
 
 string getFullPath(IObject object)
 {
+    return getPathRelativeTo(object, null, true);    
+}
+
+string getPathRelativeTo(IObject object, IObject root, bool includeRootSlash)
+{
     size_t totalLength;
     size_t writtenTo;
     IObject copy = object;
-    string ret;
+    string result;
     
     void recurse(IObject object) {
-        if (object is null) {
-            ret.length = totalLength;
+        if (object is root) {
+            result.length = totalLength;
+            if (!includeRootSlash)
+                result = result[1..$];
             return;
         }
         string thisName = object["name"].get!(string);
         totalLength += thisName.length + 1;
         recurse(object.parent);
-        ret[writtenTo++] = '/';
-        ret[writtenTo..writtenTo+thisName.length] = thisName[];
+        result[writtenTo++] = '/';
+        result[writtenTo..writtenTo+thisName.length] = thisName[];
         writtenTo += thisName.length;
     }
     recurse(object);
-    return ret;
+    return result;
 }
 
 Variant[string] getProperties(IObject object)

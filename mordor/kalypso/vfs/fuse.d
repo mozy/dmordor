@@ -31,9 +31,14 @@ static this()
 
 void attachThread()
 {
+    bool needWorker = false;
     if (Thread.getThis is null) {
         thread_attachThis();
-        new WorkerPool("fuse");
+        needWorker = true;
+    }
+    thread_reattachThis();
+    if (needWorker) {
+        new WorkerPool("fuse", 1, true);
     }
 }
     
@@ -60,7 +65,17 @@ extern (C) int vfs_getattr(char* path, stat_t* stbuf)
             default:
                 break;
         }
-        return -ENOENT;
+        auto obj = _root.find(pathstr);
+        if (obj is null)
+            return -ENOENT;
+        switch(obj["type"].get!(string)) {
+            case "directory":
+                stbuf.st_mode = S_IFDIR | 0755;
+                stbuf.st_nlink = 3;
+                return 0;
+            default:
+                return -EIO;        
+        }
     } catch (Object o) {
         auto ex = cast(Exception)o;
         if (ex !is null) {
@@ -72,7 +87,7 @@ extern (C) int vfs_getattr(char* path, stat_t* stbuf)
         } else {
             _log.fatal("In getattr, unhandled exception: {}", o);
         }
-        return -ENOENT;
+        return -EIO;
     }
 }
 
@@ -114,11 +129,24 @@ struct DirContext
                 return;
             }
         }
+        stat_t stbuf;
+        stat_t* stptr;
         foreach(c; &obj.children) {
-            string path = getFullPath(c);
+            string path = c["name"].get!(string);
+            string type = c["type"].get!(string);
+            switch (type) {
+                case "directory":
+                    stbuf.st_mode = S_IFDIR | 0755;
+                    stbuf.st_nlink = 3;
+                    stptr = &stbuf;
+                    break;
+                default:
+                    stptr = null;
+                    break;
+            }
             ++offset;
-            _logReaddir.trace("readdir worker '{}' ({})", path, offset);
-            if (filler(buf, toStringz(path), null, offset)) {
+            _logReaddir.trace("readdir worker '{}' is a {} ({})", path, type, offset);
+            if (filler(buf, toStringz(path), stptr, offset)) {
                 _logReaddir.trace("readdir buffer full");
                 full = true;
                 Fiber.yield();
@@ -143,7 +171,7 @@ extern (C) int vfs_opendir(char* path, fuse_file_info* fi)
             return -ENOENT;
         auto ctx = new DirContext();
         ctx.obj = obj;
-        ctx.fiber = new Fiber(&ctx.run, 64 * 1024);
+        ctx.fiber = new Fiber(&ctx.run, 128 * 1024);
         GC.addRoot(ctx);
         fi.fh = cast(uint64_t)ctx;
         return 0;
@@ -158,7 +186,8 @@ extern (C) int vfs_readdir(char *path, void *buf, fuse_fill_dir_t filler,
     attachThread();
     try {
         auto ctx = cast(DirContext*)fi.fh;
-        _log.trace("readdir '{}' ({})", 1 /*getFullPath(ctx.obj)*/, offset);
+        assert(ctx);
+        _log.trace("readdir '{}' ({})", getPathRelativeTo(ctx.obj, _root, true), offset);
         
         if (offset != ctx.offset) {
             return -ENOENT;
@@ -175,6 +204,7 @@ extern (C) int vfs_readdir(char *path, void *buf, fuse_fill_dir_t filler,
         }
     } catch (Object o) {
         _log.error("oh crap {}", o);
+        return 0;
     }
 }
 
@@ -182,7 +212,8 @@ extern (C) int vfs_releasedir(char* path, fuse_file_info* fi)
 {
     attachThread();
     auto ctx = cast(DirContext*)fi.fh;
-    _log.trace("releasedir '{}'", getFullPath(ctx.obj));
+    assert(ctx);
+    _log.trace("releasedir '{}'", getPathRelativeTo(ctx.obj, _root, true));
     ctx.done = true;
     if (ctx.fiber.state != Fiber.State.TERM)
         ctx.fiber.call();
@@ -207,8 +238,13 @@ main(char[][] argv)
     Config.loadFromEnvironment();
     Log.root.add(new AppendConsole());
     enableLoggers();
+    
+    scope pool = new WorkerPool("fuse", 1, true);
 
-    _root = TritonVFS.get.registerContainer("barbara-at-barbarastogner.com@mozy.test", 162958);
+    _root = TritonVFS.get.registerContainer("clint.gordoncarroll@gmail.com", 549169);
+//    _root = TritonVFS.get.registerContainer("barbara-at-barbarastogner.com@mozy.test", 162958);
+
+    scope (exit) TritonVFS.cleanup();
     
     char*[] argv2;
     argv2.length = argv.length;

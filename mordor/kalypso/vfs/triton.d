@@ -17,6 +17,8 @@ import mordor.common.streams.stream;
 import mordor.common.stringutils;
 import mordor.kalypso.vfs.helpers;
 import mordor.kalypso.vfs.model;
+import mordor.triton.client.head;
+import mordor.triton.client.get;
 import mordor.triton.client.list;
 
 private Logger _log;
@@ -30,7 +32,7 @@ static this()
     _log = Log.lookup("mordor.common.kalypso.vfs.triton");
     _vfs = new TritonVFS;
     _host = Config.lookup!(string)("mordor.common.kalypso.vfs.triton.tritonhost",
-            "10.135.1.17:80",
+            "192.168.1.1:8080",
             "Triton hostname[:port]");
     _ioManager = new IOManager(1, false);
     _pool = new ConnectionPool(delegate ClientConnection() {
@@ -61,6 +63,10 @@ private:
 public:
     static TritonVFS get() {
         return _vfs;
+    }
+    
+    static void cleanup() {
+        _ioManager.stop();
     }
     
     IObject parent() { return null; }
@@ -218,7 +224,7 @@ class TritonContainer : TritonDirectory
 {    
     this(TritonUser user, long container)
     {
-        super(this, "");
+        super(this, "/");
         _user = user;
         _container = container;
     }
@@ -257,6 +263,20 @@ class TritonContainer : TritonDirectory
 
     IObject find(string path)
     {
+        if (path == "/" || path.length == 0)
+            return this;
+        char slashChar = '/';
+        if (path.length == 3 && path[0] == '/' && path[2] == ':' ||
+            path.length == 2 && path[1] == ':' ||
+            path.length > 3 && path[0] == '/' && path[2] == ':' && path[3] == '/' ||
+            path.length > 2 && path[1] == ':' && path[2] == '/')
+            slashChar = '\\';
+        if (slashChar == '/' && path[0] != '/')
+            path = "/" ~ path;
+        if (slashChar == '\\' && path[0] == '/')
+            path = path[1..$];
+        if (slashChar == '\\')
+            path = replace(path, '/', '\\');
         // TODO: actually do a HEAD request to determine the type, or look in a cache
         return new TritonDirectory(this, path);
     }
@@ -277,7 +297,7 @@ class TritonDirectory : IObject
     {
         _container = container;
         _path = path;
-        if (path.length > 0) {
+        if (path.length > 1) {
             char slashChar = _path[0] == '/' ? '/' : '\\';
             size_t slash = locatePrior(_path, slashChar);
             if (slash == _path.length)
@@ -292,13 +312,19 @@ class TritonDirectory : IObject
     {
         _log.trace("Getting parent of '{}'", _path);
         char slashChar = _path[0] == '/' ? '/' : '\\';
-        return new TritonDirectory(_container, _path[0..locatePrior(_path, slashChar, _path.length - 1)]);        
+        string parentPath = _path[0..locatePrior(_path, slashChar, _path.length - 1)];
+        if (parentPath.length <= 1 || parentPath.length == _path.length)
+            return _container;
+        else
+            return new TritonDirectory(_container, parentPath);        
     }
     
     int children(int delegate(ref IObject) dg)
     {
         list(_pool.get(0), _container._user._user, _container._container, _path, false, "", -1, false, true,
             delegate void(string file, bool isdir) {
+                if (file == "/")
+                    return;
                 int ret;
                 IObject obj;
                 if (isdir) {
@@ -394,7 +420,11 @@ class TritonFile : IObject
     IObject parent()
     {
         char slashChar = _path[0] == '/' ? '/' : '\\';
-        return new TritonDirectory(_container, _path[0..locatePrior(_path, slashChar)]);        
+        string parentPath = _path[0..locatePrior(_path, slashChar)];
+        if (parentPath.length <= 1 || parentPath.length == _path.length)
+            return _container;
+        else
+            return new TritonDirectory(_container, parentPath);        
     }
     
     int children(int delegate(ref IObject) dg)
@@ -450,4 +480,53 @@ private:
     TritonContainer _container;
     string _path;
     string _name;
+}
+
+class TritonStream : Stream
+{
+    this(string principal, long container, string path)
+    {
+        _principal = principal;
+        _container = _container;
+        _path = path;
+    }
+    
+    bool supportsRead() { return true; }
+    bool supportsSeek() { return true; }
+    bool supportsSize() { return true; }
+    
+    size_t read(Buffer b, size_t len)
+    {
+        auto stream = get(_pool.get(), _principal, _container, _path);
+        return 0;
+    }
+    
+    long seek(long offset, Anchor anchor)
+    {
+        switch (anchor) {
+            case Anchor.BEGIN:
+                assert(offset >= 0);
+                return _offset = offset;
+            case Anchor.CURRENT:
+                assert(_offset + offset >= 0);
+                return _offset += offset;
+            case Anchor.END:
+                assert(size + offset >= 0);
+                return _offset = size + offset;            
+        }
+    }
+    
+/+    long size()
+    {
+        if (_size != ~0)
+            return _size;
+        auto info = head(_pool.get(), _principal, _container, _path);
+        return _size = info.size;
+    }
++/
+private:
+    size_t _offset, _size = ~0;
+    string _principal;
+    long _container;
+    string _path;
 }

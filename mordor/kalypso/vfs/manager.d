@@ -5,7 +5,7 @@ import tango.text.Util;
 import mordor.common.exception;
 import mordor.common.stringutils;
 public import mordor.kalypso.vfs.model;
-version (Posix) import mordor.kalypso.vfs.posix;
+//version (Posix) import mordor.kalypso.vfs.posix;
 import mordor.kalypso.vfs.triton;
 version (Windows) import mordor.kalypso.vfs.win32;
 
@@ -13,7 +13,7 @@ class VFSManager
 {
 private:
     this() {
-        version (Posix) _vfss ~= new PosixVFS();
+        //version (Posix) _vfss ~= new PosixVFS();
         version (Windows) _vfss ~= new Win32VFS();
         _vfss ~= TritonVFS.get;
     }

@@ -29,7 +29,10 @@ void getMetadata(ClientConnection conn, string principal, long container,
     }
     auto request = conn.request(requestHeaders);
     scope (failure) request.abort();
-    assert(request.response.entity.contentLength == 0);
+    if (request.response.status.status != Status.OK) {
+        throw new Exception("bad triton");
+    }
+    //assert(request.response.entity.contentLength == 0);
 }
 
 void setMetadata(ClientConnection conn, string principal, long container,

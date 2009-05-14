@@ -8,7 +8,12 @@ import mordor.common.http.uri;
 import mordor.common.streams.stream;
 import mordor.common.stringutils;
 
-void head(ClientConnection conn, string principal, long container, string file)
+struct HeadInfo
+{
+    long size;    
+}
+
+HeadInfo head(ClientConnection conn, string principal, long container, string file)
 {
     Request requestHeaders;
     requestHeaders.requestLine.method = Method.HEAD;
@@ -19,6 +24,10 @@ void head(ClientConnection conn, string principal, long container, string file)
     auto request = conn.request(requestHeaders);
     scope (failure) request.abort();
     auto response = request.response;
+    assert(response.status.status == Status.OK);
+    HeadInfo result;
+    result.size = response.entity.contentLength;
+    return result;
 }
 
 debug (head) {    
