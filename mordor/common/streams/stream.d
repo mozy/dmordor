@@ -30,14 +30,14 @@ public:
         assert(b.readAvailable >= result);
     }
     body
-    { assert(false); }
+    { assert(false); return 0; }
     size_t write(Buffer b, size_t len)
     out (result)
     {
         assert(result > 0);
     }
     body
-    { assert(false); }
+    { assert(false); return 0; }
     long seek(long offset, Anchor anchor) { assert(false); }
     long size() { assert(false); }
     void truncate(long size) { assert(false); }
