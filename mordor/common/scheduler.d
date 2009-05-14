@@ -7,7 +7,6 @@ import tango.util.log.Log;
 
 import mordor.common.containers.linkedlist;
 
-
 class ThreadPool
 {
 public:
@@ -81,7 +80,7 @@ public:
             assert(getThis() is null, "Only one scheduler is allowed to be associated with any thread");
             Thread.getThis().name = name;
             t_scheduler.val = this;
-            t_fiber.val = new Fiber(&run, 8192);
+            t_fiber.val = new Fiber(&run, 65536);
         }
         _threads = new ThreadPool(name, &run, threads);
         _threads.start();
@@ -142,7 +141,7 @@ public:
     }
     body
     {
-        t_fiber.val.yieldTo();
+        t_fiber.val.yieldTo(false);
     }
 
     ThreadPool
@@ -165,7 +164,7 @@ private:
     {
         t_scheduler.val = this;
         t_fiber.val = Fiber.getThis();
-        Fiber idleFiber = new Fiber(&idle);
+        Fiber idleFiber = new Fiber(&idle, 65536);
         _log.trace("Starting thread {} in scheduler {}", cast(void*)Thread.getThis, _threads.name);
         while (true) {
             Fiber f;
@@ -256,14 +255,14 @@ parallel_do(void delegate()[] dgs ...)
     }
 
     foreach(dg; dgs) {
-        Fiber f = new Fiber(delegate void() {
+        Fiber f = new Fiber({
             auto localdg = dg;
             Fiber.yield();
             localdg();
             if (atomicIncrement(completed) == dgs.length) {
                 scheduler.schedule(caller);
             }
-        });
+        }, 8192);
         // Give the fiber a chance to copy state to local stack
         f.call();
         scheduler.schedule(f);
