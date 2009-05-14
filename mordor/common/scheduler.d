@@ -165,7 +165,7 @@ private:
         t_scheduler.val = this;
         t_fiber.val = Fiber.getThis();
         Fiber idleFiber = new Fiber(&idle, 65536);
-        _log.trace("Starting thread {} in scheduler {}", cast(void*)Thread.getThis, _threads.name);
+        _log.trace("Starting thread {} in scheduler {} on fiber {}", cast(void*)Thread.getThis, _threads.name, cast(void*)Fiber.getThis);
         while (true) {
             Fiber f;
             synchronized (_fibers) {

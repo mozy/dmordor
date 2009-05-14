@@ -7,14 +7,14 @@ import mordor.common.stringutils;
 public import mordor.kalypso.vfs.model;
 //version (Posix) import mordor.kalypso.vfs.posix;
 import mordor.kalypso.vfs.triton;
-version (Windows) import mordor.kalypso.vfs.win32;
+//version (Windows) import mordor.kalypso.vfs.win32;
 
 class VFSManager
 {
 private:
     this() {
         //version (Posix) _vfss ~= new PosixVFS();
-        version (Windows) _vfss ~= new Win32VFS();
+        //version (Windows) _vfss ~= new Win32VFS();
         _vfss ~= TritonVFS.get;
     }
 
@@ -22,7 +22,7 @@ public:
     static this() {
         _singleton = new VFSManager();
     }
-    
+
     static VFSManager get() { return _singleton; }
     
     int opApply(int delegate(ref IVFS) dg) {

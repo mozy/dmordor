@@ -17,6 +17,7 @@ Stream get(ClientConnection conn, string principal, long container, string file)
     requestHeaders.entity.extension["X-Emc-Containerid"] = to!(string)(container);
     auto request = conn.request(requestHeaders);
     scope (failure) request.abort();
+    assert(request.response.status.status == Status.OK);
     return request.responseStream;
 }
 
