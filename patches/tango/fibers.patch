@@ -1,5 +1,5 @@
 diff --git a/git-svn:lib/common/tango/core/Thread.d b/master:lib/common/tango/core/Thread.d
-index 824e7a6..61943f3 100644
+index 824e7a6..e958c30 100644
 --- a/git-svn:lib/common/tango/core/Thread.d
 +++ b/master:lib/common/tango/core/Thread.d
 @@ -83,6 +83,7 @@ version( Win32 )
@@ -426,16 +426,21 @@ index 824e7a6..61943f3 100644
              // edi,esi,ebp,esp,ebx,edx,ecx,eax
              t.m_reg[0] = context.Edi;
              t.m_reg[1] = context.Esi;
-@@ -1888,7 +1856,7 @@ extern (C) void thread_suspendAll()
+@@ -1886,9 +1854,11 @@ extern (C) void thread_suspendAll()
+                     // as in Semaphore.d ?
+                 }
              }
-             else if( !t.m_lock )
+-            else if( !t.m_lock )
++            else
              {
 -                t.m_curr.tstack = getStackTop();
++                // We should not be doing a GC allocation on the current thread while we're locked
++                assert( !t.m_lock );
 +                t.m_curr.m_ctxt.tstack = getStackTop();
              }
          }
      }
-@@ -1988,7 +1956,7 @@ body
+@@ -1988,7 +1958,7 @@ body
              }
  
              if( !t.m_lock )
@@ -444,7 +449,7 @@ index 824e7a6..61943f3 100644
              t.m_reg[0 .. $] = 0;
          }
          else version( Posix )
-@@ -2015,7 +1983,7 @@ body
+@@ -2015,7 +1985,7 @@ body
              }
              else if( !t.m_lock )
              {
@@ -453,7 +458,15 @@ index 824e7a6..61943f3 100644
              }
          }
      }
-@@ -2072,8 +2040,8 @@ body
+@@ -2045,7 +2015,6 @@ body
+ 
+ private alias void delegate( void*, void* ) scanAllThreadsFn;
+ 
+-
+ /**
+  * The main entry point for garbage collection.  The supplied delegate
+  * will be passed ranges representing both stack and register values.
+@@ -2072,8 +2041,8 @@ body
          thisThread  = Thread.getThis();
          if( thisThread && (!thisThread.m_lock) )
          {
@@ -464,7 +477,7 @@ index 824e7a6..61943f3 100644
          }
      }
  
-@@ -2083,7 +2051,7 @@ body
+@@ -2083,7 +2052,7 @@ body
          {
              if( thisThread && (!thisThread.m_lock) )
              {
@@ -473,7 +486,7 @@ index 824e7a6..61943f3 100644
              }
          }
      }
-@@ -2097,8 +2065,9 @@ body
+@@ -2097,8 +2066,9 @@ body
          {
              // NOTE: We can't index past the bottom of the stack
              //       so don't do the "+1" for StackGrowsDown.
@@ -484,7 +497,7 @@ index 824e7a6..61943f3 100644
          }
          else
          {
-@@ -2382,7 +2351,7 @@ private
+@@ -2382,7 +2352,7 @@ private
      {
          version( X86_64 )
          {
@@ -493,7 +506,7 @@ index 824e7a6..61943f3 100644
          }
          else
          {
-@@ -2392,22 +2361,15 @@ private
+@@ -2392,22 +2362,15 @@ private
                  version = AsmX86_Posix;
          }
      }
@@ -502,15 +515,15 @@ index 824e7a6..61943f3 100644
      {
          version( Posix )
 -            version = AsmPPC_Posix;
-+            version = AsmX86_64_Posix;
-     }
+-    }
 -    version( LLVM_InlineAsm_X86 ) 
 -    {
 -        version( Win32 )
 -            version = LLVM_AsmX86_Win32;
 -        else version( Posix )
 -            version = LLVM_AsmX86_Posix;
--    }
++            version = AsmX86_64_Posix;
+     }
 -    else version( LLVM_InlineAsm_X86_64 )
 +    else version( PPC )
      {
@@ -520,7 +533,7 @@ index 824e7a6..61943f3 100644
      }
  
      version( Posix )
-@@ -2418,11 +2380,8 @@ private
+@@ -2418,11 +2381,8 @@ private
  
          version( AsmX86_Win32 ) {} else
          version( AsmX86_Posix ) {} else
@@ -533,7 +546,7 @@ index 824e7a6..61943f3 100644
          {
              // NOTE: The ucontext implementation requires architecture specific
              //       data definitions to operate so testing for it must be done
-@@ -2431,6 +2390,7 @@ private
+@@ -2431,6 +2391,7 @@ private
              //       an obsolescent feature according to the POSIX spec, so a
              //       custom solution is still preferred.
              import tango.stdc.posix.ucontext;
@@ -541,7 +554,7 @@ index 824e7a6..61943f3 100644
          }
      }
      const size_t PAGESIZE;
-@@ -2473,25 +2433,30 @@ private
+@@ -2473,25 +2434,30 @@ private
          Fiber   obj = Fiber.getThis();
          assert( obj );
  
@@ -579,7 +592,7 @@ index 824e7a6..61943f3 100644
      }
  
  
-@@ -2576,36 +2541,54 @@ private
+@@ -2576,36 +2542,54 @@ private
                  ret;
              }
          }
@@ -653,7 +666,7 @@ index 824e7a6..61943f3 100644
          }
      }
  }
-@@ -2687,7 +2670,7 @@ class Fiber
+@@ -2687,7 +2671,7 @@ class Fiber
       * In:
       *  fn must not be null.
       */
@@ -662,7 +675,7 @@ index 824e7a6..61943f3 100644
      in
      {
          assert( fn );
-@@ -2697,7 +2680,8 @@ class Fiber
+@@ -2697,7 +2681,8 @@ class Fiber
          m_fn    = fn;
          m_call  = Call.FN;
          m_state = State.HOLD;
@@ -672,7 +685,7 @@ index 824e7a6..61943f3 100644
          initStack();
      }
  
-@@ -2713,7 +2697,7 @@ class Fiber
+@@ -2713,7 +2698,7 @@ class Fiber
       * In:
       *  dg must not be null.
       */
@@ -681,7 +694,7 @@ index 824e7a6..61943f3 100644
      in
      {
          assert( dg );
-@@ -2723,7 +2707,8 @@ class Fiber
+@@ -2723,7 +2708,8 @@ class Fiber
          m_dg    = dg;
          m_call  = Call.DG;
          m_state = State.HOLD;
@@ -691,7 +704,7 @@ index 824e7a6..61943f3 100644
          initStack();
      }
  
-@@ -2745,7 +2730,10 @@ class Fiber
+@@ -2745,7 +2731,10 @@ class Fiber
          //       means of ensuring the user isn't violating this object's
          //       contract, so for now this requirement will be enforced by
          //       documentation only.
@@ -703,7 +716,7 @@ index 824e7a6..61943f3 100644
      }
  
  
-@@ -2782,15 +2770,17 @@ class Fiber
+@@ -2782,15 +2771,17 @@ class Fiber
      {
          Fiber   cur = getThis();
  
@@ -727,7 +740,7 @@ index 824e7a6..61943f3 100644
  
          // NOTE: If the fiber has terminated then the stack pointers must be
          //       reset.  This ensures that the stack for this fiber is not
-@@ -2814,6 +2804,28 @@ class Fiber
+@@ -2814,6 +2805,28 @@ class Fiber
          return null;
      }
  
@@ -756,7 +769,7 @@ index 824e7a6..61943f3 100644
  
      /**
       * Resets this fiber so that it may be re-used with the same function.
-@@ -2836,6 +2848,10 @@ class Fiber
+@@ -2836,6 +2849,10 @@ class Fiber
      body
      {
          m_state = State.HOLD;
@@ -767,7 +780,7 @@ index 824e7a6..61943f3 100644
          initStack();
          m_unhandled = null;
      }
-@@ -2863,6 +2879,10 @@ class Fiber
+@@ -2863,6 +2880,10 @@ class Fiber
          m_fn    = fn;
          m_call  = Call.FN;
          m_state = State.HOLD;
@@ -778,7 +791,7 @@ index 824e7a6..61943f3 100644
          initStack();
          m_unhandled = null;
      }
-@@ -2891,6 +2911,10 @@ class Fiber
+@@ -2891,6 +2912,10 @@ class Fiber
          m_dg    = dg;
          m_call  = Call.DG;
          m_state = State.HOLD;
@@ -789,7 +802,7 @@ index 824e7a6..61943f3 100644
          initStack();
          m_unhandled = null;
      }
-@@ -2962,13 +2986,19 @@ class Fiber
+@@ -2962,13 +2987,19 @@ class Fiber
          Fiber   cur = getThis();
          assert( cur, "Fiber.yield() called with no active fiber" );
          assert( cur.m_state == State.EXEC );
@@ -814,7 +827,7 @@ index 824e7a6..61943f3 100644
      }
  
  
-@@ -2992,14 +3022,20 @@ class Fiber
+@@ -2992,14 +3023,20 @@ class Fiber
          Fiber   cur = getThis();
          assert( cur, "Fiber.yield() called with no active fiber" );
          assert( cur.m_state == State.EXEC );
@@ -840,7 +853,7 @@ index 824e7a6..61943f3 100644
      }
  
  
-@@ -3029,34 +3065,6 @@ class Fiber
+@@ -3029,34 +3066,6 @@ class Fiber
      }
  
  
@@ -875,7 +888,7 @@ index 824e7a6..61943f3 100644
  private:
      //
      // Initializes a fiber object which has no associated executable function.
-@@ -3064,6 +3072,40 @@ private:
+@@ -3064,6 +3073,40 @@ private:
      this()
      {
          m_call = Call.NO;
@@ -916,7 +929,7 @@ index 824e7a6..61943f3 100644
      }
  
  
-@@ -3087,6 +3129,40 @@ private:
+@@ -3087,6 +3130,40 @@ private:
      }
  
  
@@ -957,7 +970,7 @@ index 824e7a6..61943f3 100644
  private:
      //
      // The type of routine passed on fiber construction.
-@@ -3108,9 +3184,16 @@ private:
+@@ -3108,9 +3185,16 @@ private:
          void function() m_fn;
          void delegate() m_dg;
      }
@@ -975,7 +988,7 @@ index 824e7a6..61943f3 100644
  
  
  private:
-@@ -3122,16 +3205,18 @@ private:
+@@ -3122,16 +3206,18 @@ private:
      //
      // Allocate a new stack for this fiber.
      //
@@ -998,7 +1011,7 @@ index 824e7a6..61943f3 100644
  
          // NOTE: This instance of Thread.Context is dynamic so Fiber objects
          //       can be collected by the GC so long as no user level references
-@@ -3141,13 +3226,19 @@ private:
+@@ -3141,13 +3227,19 @@ private:
          //       room for this struct explicitly would be to mash it into the
          //       base of the stack being allocated below.  However, doing so
          //       requires too much special logic to be worthwhile.
@@ -1020,7 +1033,7 @@ index 824e7a6..61943f3 100644
                                     MEM_RESERVE,
                                     PAGE_NOACCESS );
              if( !m_pmem )
-@@ -3159,18 +3250,18 @@ private:
+@@ -3159,18 +3251,18 @@ private:
              {
                  void* stack = m_pmem + PAGESIZE;
                  void* guard = m_pmem;
@@ -1042,7 +1055,7 @@ index 824e7a6..61943f3 100644
                                    MEM_COMMIT,
                                    PAGE_READWRITE );
              if( !stack )
-@@ -3190,13 +3281,12 @@ private:
+@@ -3190,13 +3282,12 @@ private:
  
              m_ctxt.bstack = pbase;
              m_ctxt.tstack = pbase;
@@ -1057,7 +1070,7 @@ index 824e7a6..61943f3 100644
                                 PROT_READ | PROT_WRITE,
                                 MAP_PRIVATE | MAP_ANON,
                                 -1,
-@@ -3206,11 +3296,11 @@ private:
+@@ -3206,11 +3297,11 @@ private:
              }
              else static if( is( typeof( valloc ) ) )
              {
@@ -1071,7 +1084,7 @@ index 824e7a6..61943f3 100644
              }
              else
              {
-@@ -3224,15 +3314,14 @@ private:
+@@ -3224,15 +3315,14 @@ private:
  
              version( StackGrowsDown )
              {
@@ -1089,7 +1102,7 @@ index 824e7a6..61943f3 100644
          }
  
          Thread.add( m_ctxt );
-@@ -3262,7 +3351,7 @@ private:
+@@ -3262,7 +3352,7 @@ private:
          }
          else static if( is( typeof( mmap ) ) )
          {
@@ -1098,7 +1111,7 @@ index 824e7a6..61943f3 100644
          }
          else static if( is( typeof( valloc ) ) )
          {
-@@ -3272,7 +3361,6 @@ private:
+@@ -3272,7 +3362,6 @@ private:
          {
              free( m_pmem );
          }
@@ -1106,7 +1119,7 @@ index 824e7a6..61943f3 100644
      }
  
  
-@@ -3320,12 +3408,12 @@ private:
+@@ -3320,12 +3409,12 @@ private:
              version( StackGrowsDown )
              {
                  push( cast(size_t) m_ctxt.bstack );                 // FS:[4]
@@ -1121,12 +1134,13 @@ index 824e7a6..61943f3 100644
              }
              push( 0x00000000 );                                     // EBX
              push( 0x00000000 );                                     // ESI
-@@ -3342,22 +3430,17 @@ private:
+@@ -3342,22 +3431,17 @@ private:
              push( 0x00000000 );                                     // ESI
              push( 0x00000000 );                                     // EDI
          }
 -        else version( LLVM_AsmX86_Posix )
--        {
++        else version( AsmX86_64_Posix )
+         {
 -            push( cast(size_t) &fiber_entryPoint );                 // EIP
 -            push( 0x00000000 );                                     // newp
 -            push( 0x00000000 );                                     // oldp
@@ -1134,12 +1148,6 @@ index 824e7a6..61943f3 100644
 -            push( 0x00000000 );                                     // EBX
 -            push( 0x00000000 );                                     // ESI
 -            push( 0x00000000 );                                     // EDI
--        }
--//TODO: Implement x86-64 fibers
--/+
--        else version( LLVM_AsmX86_Posix )
-+        else version( AsmX86_64_Posix )
-         {
 +            push( cast(size_t) &fiber_entryPoint );                 // RIP
 +            push( (cast(size_t)pstack)+8 );                         // RBP
 +            push( 0x00000000_00000000 );                            // RBX
@@ -1149,11 +1157,16 @@ index 824e7a6..61943f3 100644
 +            push( 0x00000000_00000000 );                            // R15
 +            push( 0x00001f80_01df0000 );                            // MXCSR (32 bits), x87 control (16 bits), (unused)
          }
+-//TODO: Implement x86-64 fibers
+-/+
+-        else version( LLVM_AsmX86_Posix )
+-        {
+-        }
 -+/
          else version( AsmPPC_Posix )
          {
              version( StackGrowsDown )
-@@ -3387,28 +3470,22 @@ private:
+@@ -3387,28 +3471,22 @@ private:
          }
          else static if( is( ucontext_t ) )
          {
@@ -1186,7 +1199,7 @@ index 824e7a6..61943f3 100644
      }
  
  
-@@ -3449,12 +3526,13 @@ private:
+@@ -3449,12 +3527,13 @@ private:
      final void switchIn()
      {
          Thread  tobj = Thread.getThis();
@@ -1203,7 +1216,7 @@ index 824e7a6..61943f3 100644
          //       is intended to prevent a race condition with the suspend
          //       mechanism used for garbage collection.  If it is not followed,
          //       a badly timed collection could cause the GC to scan from the
-@@ -3465,15 +3543,19 @@ private:
+@@ -3465,15 +3544,21 @@ private:
          //       successive pop operations will succeed.
          *oldp = getStackTop();
          volatile tobj.m_lock = true;
@@ -1217,6 +1230,8 @@ index 824e7a6..61943f3 100644
 +            fiber_switchContext( oldp, newp );
 +        }
  
++        // We might be in a different thread now! (due to yieldTo)
++        tobj = Thread.getThis();
          // NOTE: As above, these operations must be performed in a strict order
          //       to prevent Bad Things from happening.
 -        tobj.popContext();
@@ -1227,7 +1242,7 @@ index 824e7a6..61943f3 100644
      }
  
  
-@@ -3484,27 +3566,45 @@ private:
+@@ -3484,27 +3569,49 @@ private:
      {
          Thread  tobj = Thread.getThis();
          void**  oldp = &m_ctxt.tstack;
@@ -1256,7 +1271,11 @@ index 824e7a6..61943f3 100644
 +        } else {
 +            fiber_switchContext( oldp, newp );
 +        }
-+
+ 
+-        // NOTE: As above, these operations must be performed in a strict order
+-        //       to prevent Bad Things from happening.
++        // We might be in a different thread now!
++        tobj = Thread.getThis();
 +        volatile tobj.m_lock = false;
 +        tobj.m_curr.m_ctxt.tstack = tobj.m_curr.m_ctxt.bstack;
 +    }
@@ -1281,9 +1300,9 @@ index 824e7a6..61943f3 100644
 +        } else {
 +            fiber_switchContext( oldp, newp );
 +        }
- 
--        // NOTE: As above, these operations must be performed in a strict order
--        //       to prevent Bad Things from happening.
++
++        // We might be in a different thread now!
++        tobj = Thread.getThis();
          volatile tobj.m_lock = false;
 -        tobj.m_curr.tstack = tobj.m_curr.bstack;
 +        tobj.m_curr.m_ctxt.tstack = tobj.m_curr.m_ctxt.bstack;
