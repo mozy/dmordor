@@ -30,7 +30,7 @@ in
 }
 body
 {
-    Buffer buf1 = new Buffer, buf2 = new Buffer;
+    scope buf1 = new Buffer, buf2 = new Buffer;
     Buffer* readBuffer, writeBuffer;
     size_t chunkSize = _chunkSize.val;
     size_t todo;
