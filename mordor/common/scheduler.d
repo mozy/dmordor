@@ -95,7 +95,10 @@ public:
     void stop()
     {
         atomicStore(_stopping, true);
-        tickle();
+        // XXX: This is incorrect for useCaller = true threads
+        for (auto i = 0; i < _threads.size; ++i) {
+            tickle();
+        }
     }
     
     bool stopping()
