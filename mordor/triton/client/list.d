@@ -98,30 +98,30 @@ debug (list)
         IOManager ioManager = new IOManager();
 
         AsyncSocket s = new AsyncSocket(ioManager, AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
-        s.connect(new InternetAddress(args[1], to!(int)(args[2])));
+        s.connect(new InternetAddress(args[1]));
         SocketStream stream = new SocketStream(s);
         
         scope conn = new ClientConnection(stream);
         
         string prefix;
-        bool recurse = true;
+        bool recurse = false;
         string beginName;
         long limit = -1;
         bool includeVersions = true;
-        bool includeDirectories = false;
+        bool includeDirectories = true;
+        if (args.length > 4)
+            prefix = args[4];
         if (args.length > 5)
-            prefix = args[5];
+            recurse = to!(bool)(args[5]);
         if (args.length > 6)
-            recurse = to!(bool)(args[6]);
-        if (args.length > 7)
             beginName = args[7];
+        if (args.length > 7)
+            limit = to!(long)(args[7]);
         if (args.length > 8)
-            limit = to!(long)(args[8]);
+            includeVersions = to!(bool)(args[8]);
         if (args.length > 9)
-            includeVersions = to!(bool)(args[9]);
-        if (args.length > 10)
-            includeDirectories = to!(bool)(args[10]);
-        list(conn, args[3], to!(long)(args[4]), prefix, recurse, beginName, limit, includeVersions, includeDirectories,
+            includeDirectories = to!(bool)(args[9]);
+        list(conn, args[2], to!(long)(args[3]), prefix, recurse, beginName, limit, includeVersions, includeDirectories,
             delegate void(string path, bool isdir) {
                 Stdout.formatln("File '{}' is dir {}", path, isdir);
             });

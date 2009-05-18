@@ -2,6 +2,7 @@ module mordor.triton.client.head;
 
 import tango.util.Convert;
 
+import mordor.common.exception;
 import mordor.common.http.client;
 import mordor.common.http.parser;
 import mordor.common.http.uri;
@@ -24,13 +25,15 @@ HeadInfo head(ClientConnection conn, string principal, long container, string fi
     auto request = conn.request(requestHeaders);
     scope (failure) request.abort();
     auto response = request.response;
+    if (response.status.status == Status.NOT_FOUND)
+        throw new FileNotFoundException();
     assert(response.status.status == Status.OK);
     HeadInfo result;
     result.size = response.entity.contentLength;
     return result;
 }
 
-debug (head) {    
+debug (head) {
     import tango.net.InternetAddress;
     import tango.util.log.AppendConsole;
     
