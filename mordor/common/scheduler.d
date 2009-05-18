@@ -167,7 +167,7 @@ private:
     {
         t_scheduler.val = this;
         t_fiber.val = Fiber.getThis();
-        Fiber idleFiber = new Fiber(&idle, 65536);
+        Fiber idleFiber = new Fiber(&idle, 65536 * 4);
         _log.trace("Starting thread {} in scheduler {} on fiber {}", cast(void*)Thread.getThis, _threads.name, cast(void*)Fiber.getThis);
         while (true) {
             Fiber f;
@@ -271,6 +271,44 @@ parallel_do(void delegate()[] dgs ...)
         scheduler.schedule(f);
     }
     scheduler.yieldTo();
+}
+
+void
+parallel_foreach(C, T)(C collection, int delegate(ref T) dg,
+        int parallelism = -1)
+{
+    if (parallelism == -1)
+        parallelism = 4;
+    size_t running;
+    Scheduler scheduler = Scheduler.getThis();
+    Fiber caller = Fiber.getThis();
+
+    foreach(T t; collection) {
+        Fiber f = new Fiber({
+            T localt = t;
+            Fiber.yield();
+            dg(localt);
+            // This could be improved; currently it waits for
+            // parallelism fibers to complete, then schedules
+            // parallelism more; it would be better if we get
+            // schedule another as soon as one completes, but
+            // it's difficult to *not* schedule another if we're
+            // already done
+            if (atomicDecrement(running) == 0) {
+                scheduler.schedule(caller);
+            }
+        }, 8192);
+        // Dynamic closure-ish
+        f.call();
+        bool yield = (atomicIncrement(running) >= parallelism);
+        scheduler.schedule(f);
+        if (yield) {
+            scheduler.yieldTo();
+        }
+    }
+    if (running > 0) {
+        scheduler.yieldTo();
+    }
 }
 
 struct Aggregator(T) {
