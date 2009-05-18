@@ -29,7 +29,7 @@ class BufStream : Stream
         return todo;
     }
 
-    size_t write(IOBuffer *buf, size_t len)
+    size_t write(Buffer buf, size_t len)
     {
         return writeInternal(buf, len);
     }
@@ -39,18 +39,26 @@ class BufStream : Stream
         return writeInternal(buf, buf.length);
     }
 
-    private size_t writeInternal(T)(buf, size_t len)
+    private size_t writeInternal(T)(T buf, size_t len)
     {
         auto size = _orig.readAvailable();
         if(_off == size) {
             _log.trace("write at EOF {} {}", _off, len);
-            _orig.copyIn(buf, len);
+            static if (is (T : void[])) {
+                _orig.copyIn(buf[0..len], true);
+            } else {
+                _orig.copyIn(buf, len);
+            }
             _off += len;
         } else if (_off > size) {
             _log.trace("write beyond EOF {} {}", _off, len);
             // extend the stream, then write
             truncate(_off);
-            _orig.copyIn(buf, len);
+            static if (is(T : void[])) {
+                _orig.copyIn(buf[0..len], true);
+            } else {
+                _orig.copyIn(buf, len);
+            }
             _off += len;
         } else {
             _log.trace("write midstream {} {} {}", _off, size, len);
@@ -59,19 +67,23 @@ class BufStream : Stream
             orig.copyIn(_orig, _orig.readAvailable);
             // Re-copy in to orig all data before the write
             _orig.clear();
-            _orig.copyIn(&orig, _off);
+            _orig.copyIn(orig, _off);
             orig.consume(_off);
             // copy in the write, advancing the stream pointer
-            _orig.copyIn(buf, len);
+            static if (is(T : void[])) {
+                _orig.copyIn(buf[0..len], true);
+            } else {
+                _orig.copyIn(buf, len);
+            }
             _off += len;
             if (_off < size) {
                 orig.consume(len);        
                 // Copy in any remaining data beyond the write
-                _orig.copyIn(&orig, orig.readAvailable);
+                _orig.copyIn(orig, orig.readAvailable);
             }
             // Reset our read buffer to the current stream pos
             _buf.clear();
-            _buf.copyIn(&_orig, _orig.readAvailable);
+            _buf.copyIn(_orig, _orig.readAvailable);
             _buf.consume(_off);
         }
         return len;
@@ -80,47 +92,47 @@ class BufStream : Stream
     long seek(long offset, Anchor anchor)
     in
     {
-        switch(dir) {
+        switch(anchor) {
             case Anchor.BEGIN:
-                assert(off >= 0);
+                assert(offset >= 0);
                 break;
             case Anchor.CURRENT:
-                assert(_off + off >= 0);
+                assert(_off + offset >= 0);
                 break;
             case Anchor.END:
-                assert(_orig.readAvailable + off >= 0);
+                assert(_orig.readAvailable + offset >= 0);
                 break;
         }
     }
     body
     {
-        auto size = m_orig.readAvailable;
+        auto size = _orig.readAvailable;
     
-        switch(dir) {
+        switch(anchor) {
             case Anchor.BEGIN:
                 // Change this into a from current to try and catch an optimized
                 // forward seek
-                return seek(_off - off, Anchor.CURRENT);
+                return seek(_off - offset, Anchor.CURRENT);
             case Anchor.CURRENT:
-                if(off < 0) {
-                    _off += off;
+                if(offset < 0) {
+                    _off += offset;
                     _buf.clear();
-                    _buf.copyIn(&_orig, _orig.readAvailable);
-                    _buf.consume(min(off, size));
+                    _buf.copyIn(_orig, _orig.readAvailable);
+                    _buf.consume(min(offset, size));
                     return _off;
                 } else {
                     // Optimized forward seek
                     if (_off < size) {
-                        _buf.consume(min(off, size - _off));
+                        _buf.consume(min(offset, size - _off));
                     } else {
                         _buf.clear();
                     }
-                    return _off += off;
+                    return _off += offset;
                 }
             case Anchor.END:
                 // Change this into a FromCurrent to try and catch an optimized
                 // forward seek
-                return seek(size + off - _off, Anchor.CURRENT);
+                return seek(size + offset - _off, Anchor.CURRENT);
         }
     }
 
@@ -146,7 +158,7 @@ class BufStream : Stream
             orig.copyIn(_orig);
             _orig.clear();
     
-            _orig.copyIn(&orig, len);
+            _orig.copyIn(orig, len);
     
             _buf.clear();
             _buf.copyIn(_orig, len);
