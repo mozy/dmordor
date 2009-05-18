@@ -1,4 +1,4 @@
-module mordor.common.streams.singleplexer;
+module mordor.common.streams.singleplex;
 
 public import mordor.common.streams.filter;
 

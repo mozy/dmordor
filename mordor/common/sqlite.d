@@ -177,12 +177,13 @@ public:
     
     int executeUpdate()
     {
+        int rc;
         scope (exit) {
             rc = sqlite3_reset(_stmt);
             if (rc != SQLITE_OK)
                 throw new SqliteException(_db._db, rc);
         }
-        int rc = sqlite3_step(_stmt);
+        rc = sqlite3_step(_stmt);
         switch (rc) {
             case SQLITE_ROW:
                 assert(false);

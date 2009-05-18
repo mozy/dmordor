@@ -1,6 +1,6 @@
 module mordor.common.http.dispatcher;
-
-import mordor.common.http.http;
+/+
+import mordor.common.http.parser;
 import mordor.common.http.servlet;
 import mordor.common.streams.stream;
 
@@ -62,3 +62,4 @@ private:
     static Servlet _defaultServlet;
     Servlet[] _servlets;
 }
++/
