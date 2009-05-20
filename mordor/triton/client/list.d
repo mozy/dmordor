@@ -52,8 +52,9 @@ void list(ClientConnection conn, string principal, long container,
             void delegate(string, bool) fileDg)
 {
     Request requestHeaders;
-    requestHeaders.requestLine.uri = "/rest/namedObjects?Prefix=" ~ escapeQueryString(prefix) ~
-        "&Recurse=" ~ (recurse ? "1" : "0") ~ "&BeginName=" ~ escapeQueryString(beginName) ~
+    requestHeaders.requestLine.uri = "/rest/namedObjects";
+    requestHeaders.requestLine.uri.query = "Prefix=" ~ prefix ~
+        "&Recurse=" ~ (recurse ? "1" : "0") ~ "&BeginName=" ~ beginName ~
         (limit == -1 ? "" : "&Limit=" ~ to!(string)(limit)) ~
         "&IncludeVersions=" ~ (includeVersions ? "1" : "0") ~
         "&IncludeDirectories=" ~ (includeDirectories ? "1" : "0");

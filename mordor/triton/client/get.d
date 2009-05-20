@@ -11,7 +11,8 @@ import mordor.common.stringutils;
 Stream get(ClientConnection conn, string principal, long container, string file)
 {
     Request requestHeaders;
-    requestHeaders.requestLine.uri = "/rest/namedObjects/" ~ escapePath(file);
+    requestHeaders.requestLine.uri = "/rest/namedObjects";
+    requestHeaders.requestLine.uri.path.segments ~= file;
     requestHeaders.request.host = "triton";
     requestHeaders.entity.extension["X-Emc-Principalid"] = principal;
     requestHeaders.entity.extension["X-Emc-Containerid"] = to!(string)(container);
@@ -43,10 +44,10 @@ debug (get)
         IOManager ioManager = new IOManager();
     
         AsyncSocket s = new AsyncSocket(ioManager, AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
-        s.connect(new InternetAddress(args[1], to!(int)(args[2])));
+        s.connect(new InternetAddress(args[1]));
         SocketStream stream = new SocketStream(s);
         
         scope conn = new ClientConnection(stream);
-        transferStream(get(conn, args[3], args[4], to!(long)(args[5])), new StdoutStream());
+        transferStream(get(conn, args[2], to!(long)(args[3]), args[4]), new StdoutStream());
     }
 }

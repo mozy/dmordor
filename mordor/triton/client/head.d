@@ -18,7 +18,8 @@ HeadInfo head(ClientConnection conn, string principal, long container, string fi
 {
     Request requestHeaders;
     requestHeaders.requestLine.method = Method.HEAD;
-    requestHeaders.requestLine.uri = "/rest/namedObjects/" ~ escapePath(file);
+    requestHeaders.requestLine.uri = "/rest/namedObjects";
+    requestHeaders.requestLine.uri.path.segments ~= file;
     requestHeaders.request.host = "triton";
     requestHeaders.entity.extension["X-Emc-Principalid"] = principal;
     requestHeaders.entity.extension["X-Emc-Containerid"] = to!(string)(container);

@@ -37,7 +37,7 @@ class ClientConnection : Connection
                    requestLine.ver == Version(1, 0) ||
                    requestLine.ver == Version(1, 1));
             // Have to request something
-            assert(requestLine.uri.length > 0);
+            assert(requestLine.uri.isDefined);
             // Host header required with HTTP/1.1
             assert(request.host.length > 0 || requestLine.ver != Version(1, 1));
             // If any transfer encodings, must include chunked, must have chunked only once, and must be the last one

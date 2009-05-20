@@ -1,5 +1,5 @@
 /* To compile to .d:
-   ragel parser.rl -D -o parser.d
+   ragel parser.rl -D -G2 -o parser.d
 */
 
 module mordor.common.http.parser;
@@ -10,8 +10,11 @@ import tango.util.Convert;
 import tango.util.log.Log;
 
 import mordor.common.containers.redblacktree;
+import mordor.common.http.uri;
 import mordor.common.ragel;
 import mordor.common.stringutils;
+
+private alias mordor.common.http.uri.unescape unescape;
 
 enum Method
 {
@@ -133,12 +136,12 @@ alias ValueWithParameters[] ParameterizedList;
 struct RequestLine
 {
     Method method;
-    string uri;
+    URI uri;
     Version ver;
     
     string toString()
     {
-        return _methodStrings[cast(size_t)method] ~ " " ~ uri ~ " " ~ ver.toString();
+        return _methodStrings[cast(size_t)method] ~ " " ~ to!(string)(uri) ~ " " ~ ver.toString();
     }
 }
 
@@ -195,13 +198,13 @@ struct RequestHeaders
 
 struct ResponseHeaders
 {
-    string location;
+    URI location;
 
     string toString()
     {
         string ret;
-        if (location.length > 0)
-            ret ~= "Location: " ~ location ~ "\r\n";
+        if (location.isDefined)
+            ret ~= "Location: " ~ to!(string)(location) ~ "\r\n";
         return ret;
     }
 }
@@ -479,12 +482,12 @@ private:
         }
 
         # TODO: Parse and save the port
-        Host = 'Host:' @set_host LWS* hostport >mark %save_string LWS*;
+        Host = 'Host:' @set_host LWS* host (':' port)? >mark %save_string LWS*;
         
         request_header = Host;
     
         Method = token >mark %parse_Method;
-        Request_URI = ( "*" | absoluteURI | hier_part | authority) >mark %parse_Request_URI;
+        Request_URI = ( "*" | absolute_URI | hier_part | authority) >mark %parse_Request_URI;
         Request_Line = Method SP Request_URI SP HTTP_Version CRLF;
         Request = Request_Line ((general_header | request_header | entity_header) CRLF)* CRLF @done;
     
@@ -502,7 +505,8 @@ public:
 protected:
     void exec()
     {
-        with(_request.requestLine) with(_request.entity) with(*_request) {
+        with(_request.requestLine.uri) with(_request.requestLine)
+        with(_request.entity) with(*_request) {
             %% write exec;
         }
     }
@@ -554,10 +558,9 @@ private:
         
         action set_location {
             _headerHandled = true;
-            _string = &response.location;
         }
         
-        Location = 'Location:' @set_location LWS* absoluteURI >mark %save_string LWS*;
+        Location = 'Location:' @set_location LWS* absolute_URI LWS*;
         
         response_header = Location;
 
@@ -581,7 +584,8 @@ public:
 protected:
     void exec()
     {
-        with(_response.status) with(_response.entity) with (*_response) {
+        with(_response.response.location) with(_response.status)
+        with(_response.entity) with (*_response) {
             %% write exec;
         }
     }
