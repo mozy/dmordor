@@ -279,14 +279,21 @@ struct URI
                        int defaultPort = -1, bool emptyPortValid = false)
         {
             _host = toLower(_host);
-            if (port == defaultPort)
-                port = -1;
-            if (port == -1 && !emptyPortValid)
-                portDefined = false;
+            if (_port == defaultPort)
+                _port = -1;
+            if (_port == -1 && !emptyPortValid)
+                _portDefined = false;
             if (_host == defaultHost)
                 _host.length = 0;
-            if (_host.length == 0 && !emptyHostValid && !userinfoDefined && !portDefined)
-                hostDefined = false;
+            if (_host.length == 0 && !emptyHostValid && !userinfoDefined && !_portDefined)
+                _hostDefined = false;
+        }
+        
+        bool opEquals(ref Authority rhs)
+        {
+            return _userinfo == rhs._userinfo && _host == rhs._host &&
+                _port == rhs._port && _userinfoDefined == rhs._userinfoDefined &&
+                _hostDefined == rhs._hostDefined && _portDefined == rhs._portDefined;
         }
     private:
         string _userinfo, _host;
@@ -405,6 +412,11 @@ struct URI
                 segments = rhs.segments;
             return *this;
         }
+        
+        bool opEquals(ref Path rhs)
+        {
+            return type == rhs.type && segments == rhs.segments;
+        }
 
         string[] segments;
     }
@@ -499,7 +511,11 @@ struct URI
 
     void normalize()
     {
-        _scheme = toLower(_scheme);
+        if (_scheme.length > 0) {
+            string newScheme;
+            newScheme.length = _scheme.length;
+            _scheme = toLower(_scheme, newScheme);
+        }
         switch(_scheme) {
             case "http":
             case "https":
@@ -517,6 +533,40 @@ struct URI
         }
     }
     
+    bool opEquals(ref URI rhs)
+    {
+        return _scheme == rhs._scheme && authority == rhs.authority &&
+               path == rhs.path && _query == rhs._query && _fragment == rhs._fragment &&
+               _schemeDefined == rhs._schemeDefined && _queryDefined == rhs._queryDefined &&
+               _fragmentDefined == rhs._fragmentDefined;
+    }
+    
+    unittest
+    {
+        URI lhs = "example://a/b/c/%7Bfoo%7D";
+        URI rhs = "eXAMPLE://a/./b/../b/%63/%7bfoo%7d";
+        
+        lhs.normalize();
+        rhs.normalize();
+        assert(lhs._schemeDefined == rhs._schemeDefined);
+        assert(lhs._scheme == rhs._scheme);
+        assert(lhs.authority._portDefined == rhs.authority._portDefined);
+        assert(lhs.authority._port == rhs.authority._port);
+        assert(lhs.authority._hostDefined == rhs.authority._hostDefined);
+        assert(lhs.authority._host == rhs.authority._host);
+        assert(lhs.authority._userinfoDefined == rhs.authority._userinfoDefined);
+        assert(lhs.authority._userinfo == rhs.authority._userinfo);
+        assert(lhs.authority == rhs.authority);
+        assert(lhs.path.type == rhs.path.type);
+        assert(lhs.path.segments == rhs.path.segments);
+        assert(lhs.path == rhs.path);
+        assert(lhs._queryDefined == rhs._queryDefined);
+        assert(lhs._query == rhs._query);
+        assert(lhs._fragmentDefined == rhs._fragmentDefined);
+        assert(lhs._fragment == rhs._fragment);
+        assert(lhs == rhs);
+    }
+
     static URI transform(URI base, URI relative)
     in
     {
@@ -628,7 +678,7 @@ private:
     bool _schemeDefined, _queryDefined, _fragmentDefined;
 };
 
-#line 740 "uri_parser.rl"
+#line 790 "uri_parser.rl"
 
 
 
@@ -636,14 +686,14 @@ private class URIParser : RagelParser
 {
 private:
     
-#line 640 "uri.d"
+#line 690 "uri.d"
 static const int uri_parser_proper_start = 231;
 static const int uri_parser_proper_first_final = 231;
 static const int uri_parser_proper_error = 0;
 
 static const int uri_parser_proper_en_main = 231;
 
-#line 751 "uri_parser.rl"
+#line 801 "uri_parser.rl"
 
 
 public:
@@ -656,11 +706,11 @@ public:
     {
         super.init();
         
-#line 660 "uri.d"
+#line 710 "uri.d"
 	{
 	cs = uri_parser_proper_start;
 	}
-#line 763 "uri_parser.rl"
+#line 813 "uri_parser.rl"
     }
 
 protected:
@@ -668,7 +718,7 @@ protected:
     {
         with(*_uri) {
             
-#line 672 "uri.d"
+#line 722 "uri.d"
 	{
 	if ( p == pe )
 		goto _test_eof;
@@ -705,18 +755,18 @@ st0:
 cs = 0;
 	goto _out;
 tr234:
-#line 706 "uri_parser.rl"
+#line 756 "uri_parser.rl"
 	{
         path.type = URI.Path.Type.RELATIVE;
     }
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st232;
 st232:
 	if ( ++p == pe )
 		goto _test_eof232;
 case 232:
-#line 720 "uri.d"
+#line 770 "uri.d"
 	switch( (*p) ) {
 		case 33u: goto st232;
 		case 35u: goto tr240;
@@ -739,82 +789,82 @@ case 232:
 		goto st232;
 	goto st0;
 tr235:
-#line 706 "uri_parser.rl"
+#line 756 "uri_parser.rl"
 	{
         path.type = URI.Path.Type.RELATIVE;
     }
 	goto st233;
 tr240:
-#line 691 "uri_parser.rl"
+#line 741 "uri_parser.rl"
 	{
         path.segments ~= unescape(mark[0..p - mark]);
         mark = null;
     }
 	goto st233;
 tr248:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
-#line 691 "uri_parser.rl"
+#line 741 "uri_parser.rl"
 	{
         path.segments ~= unescape(mark[0..p - mark]);
         mark = null;
     }
 	goto st233;
 tr254:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
-#line 718 "uri_parser.rl"
+#line 768 "uri_parser.rl"
 	{
         query = unescape(mark[0..p - mark]);
         mark = null;
     }
 	goto st233;
 tr256:
-#line 718 "uri_parser.rl"
+#line 768 "uri_parser.rl"
 	{
         query = unescape(mark[0..p - mark]);
         mark = null;
     }
 	goto st233;
 tr263:
-#line 702 "uri_parser.rl"
+#line 752 "uri_parser.rl"
 	{
         path.type = URI.Path.Type.ABSOLUTE;
     }
 	goto st233;
 tr269:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
-#line 663 "uri_parser.rl"
+#line 713 "uri_parser.rl"
 	{
         authority.host = unescape(mark[0..p - mark]);
         mark = null;
     }
 	goto st233;
 tr280:
-#line 663 "uri_parser.rl"
+#line 713 "uri_parser.rl"
 	{
         authority.host = unescape(mark[0..p - mark]);
         mark = null;
     }
 	goto st233;
 tr285:
-#line 702 "uri_parser.rl"
+#line 752 "uri_parser.rl"
 	{
         path.type = URI.Path.Type.ABSOLUTE;
     }
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
-#line 691 "uri_parser.rl"
+#line 741 "uri_parser.rl"
 	{
         path.segments ~= unescape(mark[0..p - mark]);
         mark = null;
     }
 	goto st233;
 tr291:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
-#line 650 "uri_parser.rl"
+#line 700 "uri_parser.rl"
 	{
         if (p == mark)
             authority.port = -1;
@@ -824,7 +874,7 @@ tr291:
     }
 	goto st233;
 tr295:
-#line 650 "uri_parser.rl"
+#line 700 "uri_parser.rl"
 	{
         if (p == mark)
             authority.port = -1;
@@ -837,7 +887,7 @@ st233:
 	if ( ++p == pe )
 		goto _test_eof233;
 case 233:
-#line 841 "uri.d"
+#line 891 "uri.d"
 	switch( (*p) ) {
 		case 33u: goto tr244;
 		case 37u: goto tr245;
@@ -856,14 +906,14 @@ case 233:
 		goto tr244;
 	goto st0;
 tr244:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st234;
 st234:
 	if ( ++p == pe )
 		goto _test_eof234;
 case 234:
-#line 867 "uri.d"
+#line 917 "uri.d"
 	switch( (*p) ) {
 		case 33u: goto st234;
 		case 37u: goto st1;
@@ -882,14 +932,14 @@ case 234:
 		goto st234;
 	goto st0;
 tr245:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st1;
 st1:
 	if ( ++p == pe )
 		goto _test_eof1;
 case 1:
-#line 893 "uri.d"
+#line 943 "uri.d"
 	if ( (*p) < 65u ) {
 		if ( 48u <= (*p) && (*p) <= 57u )
 			goto st2;
@@ -913,18 +963,18 @@ case 2:
 		goto st234;
 	goto st0;
 tr236:
-#line 706 "uri_parser.rl"
+#line 756 "uri_parser.rl"
 	{
         path.type = URI.Path.Type.RELATIVE;
     }
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st3;
 st3:
 	if ( ++p == pe )
 		goto _test_eof3;
 case 3:
-#line 928 "uri.d"
+#line 978 "uri.d"
 	if ( (*p) < 65u ) {
 		if ( 48u <= (*p) && (*p) <= 57u )
 			goto st4;
@@ -948,16 +998,16 @@ case 4:
 		goto st232;
 	goto st0;
 tr242:
-#line 691 "uri_parser.rl"
+#line 741 "uri_parser.rl"
 	{
         path.segments ~= unescape(mark[0..p - mark]);
         mark = null;
     }
 	goto st235;
 tr250:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
-#line 691 "uri_parser.rl"
+#line 741 "uri_parser.rl"
 	{
         path.segments ~= unescape(mark[0..p - mark]);
         mark = null;
@@ -967,7 +1017,7 @@ st235:
 	if ( ++p == pe )
 		goto _test_eof235;
 case 235:
-#line 971 "uri.d"
+#line 1021 "uri.d"
 	switch( (*p) ) {
 		case 33u: goto tr247;
 		case 35u: goto tr248;
@@ -989,30 +1039,30 @@ case 235:
 		goto tr247;
 	goto st0;
 tr260:
-#line 706 "uri_parser.rl"
+#line 756 "uri_parser.rl"
 	{
         path.type = URI.Path.Type.RELATIVE;
     }
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st236;
 tr247:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st236;
 tr262:
-#line 702 "uri_parser.rl"
+#line 752 "uri_parser.rl"
 	{
         path.type = URI.Path.Type.ABSOLUTE;
     }
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st236;
 st236:
 	if ( ++p == pe )
 		goto _test_eof236;
 case 236:
-#line 1016 "uri.d"
+#line 1066 "uri.d"
 	switch( (*p) ) {
 		case 33u: goto st236;
 		case 35u: goto tr240;
@@ -1034,30 +1084,30 @@ case 236:
 		goto st236;
 	goto st0;
 tr261:
-#line 706 "uri_parser.rl"
+#line 756 "uri_parser.rl"
 	{
         path.type = URI.Path.Type.RELATIVE;
     }
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st5;
 tr249:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st5;
 tr264:
-#line 702 "uri_parser.rl"
+#line 752 "uri_parser.rl"
 	{
         path.type = URI.Path.Type.ABSOLUTE;
     }
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st5;
 st5:
 	if ( ++p == pe )
 		goto _test_eof5;
 case 5:
-#line 1061 "uri.d"
+#line 1111 "uri.d"
 	if ( (*p) < 65u ) {
 		if ( 48u <= (*p) && (*p) <= 57u )
 			goto st6;
@@ -1081,66 +1131,66 @@ case 6:
 		goto st236;
 	goto st0;
 tr239:
-#line 706 "uri_parser.rl"
+#line 756 "uri_parser.rl"
 	{
         path.type = URI.Path.Type.RELATIVE;
     }
 	goto st237;
 tr243:
-#line 691 "uri_parser.rl"
+#line 741 "uri_parser.rl"
 	{
         path.segments ~= unescape(mark[0..p - mark]);
         mark = null;
     }
 	goto st237;
 tr251:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
-#line 691 "uri_parser.rl"
+#line 741 "uri_parser.rl"
 	{
         path.segments ~= unescape(mark[0..p - mark]);
         mark = null;
     }
 	goto st237;
 tr266:
-#line 702 "uri_parser.rl"
+#line 752 "uri_parser.rl"
 	{
         path.type = URI.Path.Type.ABSOLUTE;
     }
 	goto st237;
 tr277:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
-#line 663 "uri_parser.rl"
+#line 713 "uri_parser.rl"
 	{
         authority.host = unescape(mark[0..p - mark]);
         mark = null;
     }
 	goto st237;
 tr283:
-#line 663 "uri_parser.rl"
+#line 713 "uri_parser.rl"
 	{
         authority.host = unescape(mark[0..p - mark]);
         mark = null;
     }
 	goto st237;
 tr288:
-#line 702 "uri_parser.rl"
+#line 752 "uri_parser.rl"
 	{
         path.type = URI.Path.Type.ABSOLUTE;
     }
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
-#line 691 "uri_parser.rl"
+#line 741 "uri_parser.rl"
 	{
         path.segments ~= unescape(mark[0..p - mark]);
         mark = null;
     }
 	goto st237;
 tr294:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
-#line 650 "uri_parser.rl"
+#line 700 "uri_parser.rl"
 	{
         if (p == mark)
             authority.port = -1;
@@ -1150,7 +1200,7 @@ tr294:
     }
 	goto st237;
 tr298:
-#line 650 "uri_parser.rl"
+#line 700 "uri_parser.rl"
 	{
         if (p == mark)
             authority.port = -1;
@@ -1163,7 +1213,7 @@ st237:
 	if ( ++p == pe )
 		goto _test_eof237;
 case 237:
-#line 1167 "uri.d"
+#line 1217 "uri.d"
 	switch( (*p) ) {
 		case 33u: goto tr253;
 		case 35u: goto tr254;
@@ -1183,14 +1233,14 @@ case 237:
 		goto tr253;
 	goto st0;
 tr253:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st238;
 st238:
 	if ( ++p == pe )
 		goto _test_eof238;
 case 238:
-#line 1194 "uri.d"
+#line 1244 "uri.d"
 	switch( (*p) ) {
 		case 33u: goto st238;
 		case 35u: goto tr256;
@@ -1210,14 +1260,14 @@ case 238:
 		goto st238;
 	goto st0;
 tr255:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st7;
 st7:
 	if ( ++p == pe )
 		goto _test_eof7;
 case 7:
-#line 1221 "uri.d"
+#line 1271 "uri.d"
 	if ( (*p) < 65u ) {
 		if ( 48u <= (*p) && (*p) <= 57u )
 			goto st8;
@@ -1241,9 +1291,9 @@ case 8:
 		goto st238;
 	goto st0;
 tr237:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
-#line 706 "uri_parser.rl"
+#line 756 "uri_parser.rl"
 	{
         path.type = URI.Path.Type.RELATIVE;
     }
@@ -1252,7 +1302,7 @@ st239:
 	if ( ++p == pe )
 		goto _test_eof239;
 case 239:
-#line 1256 "uri.d"
+#line 1306 "uri.d"
 	switch( (*p) ) {
 		case 33u: goto st232;
 		case 35u: goto tr240;
@@ -1281,7 +1331,7 @@ case 239:
 		goto st239;
 	goto st0;
 tr259:
-#line 642 "uri_parser.rl"
+#line 692 "uri_parser.rl"
 	{
         scheme = unescape(mark[0..p - mark]);
         mark = null;
@@ -1291,7 +1341,7 @@ st240:
 	if ( ++p == pe )
 		goto _test_eof240;
 case 240:
-#line 1295 "uri.d"
+#line 1345 "uri.d"
 	switch( (*p) ) {
 		case 33u: goto tr260;
 		case 35u: goto tr235;
@@ -1372,14 +1422,14 @@ case 242:
 		goto tr275;
 	goto st0;
 tr267:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st9;
 st9:
 	if ( ++p == pe )
 		goto _test_eof9;
 case 9:
-#line 1383 "uri.d"
+#line 1433 "uri.d"
 	if ( 48u <= (*p) && (*p) <= 52u )
 		goto st10;
 	goto st0;
@@ -1508,45 +1558,45 @@ case 243:
 	}
 	goto st0;
 tr290:
-#line 691 "uri_parser.rl"
+#line 741 "uri_parser.rl"
 	{
         path.segments ~= unescape(mark[0..p - mark]);
         mark = null;
     }
 	goto st244;
 tr271:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
-#line 663 "uri_parser.rl"
+#line 713 "uri_parser.rl"
 	{
         authority.host = unescape(mark[0..p - mark]);
         mark = null;
     }
 	goto st244;
 tr281:
-#line 663 "uri_parser.rl"
+#line 713 "uri_parser.rl"
 	{
         authority.host = unescape(mark[0..p - mark]);
         mark = null;
     }
 	goto st244;
 tr287:
-#line 702 "uri_parser.rl"
+#line 752 "uri_parser.rl"
 	{
         path.type = URI.Path.Type.ABSOLUTE;
     }
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
-#line 691 "uri_parser.rl"
+#line 741 "uri_parser.rl"
 	{
         path.segments ~= unescape(mark[0..p - mark]);
         mark = null;
     }
 	goto st244;
 tr292:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
-#line 650 "uri_parser.rl"
+#line 700 "uri_parser.rl"
 	{
         if (p == mark)
             authority.port = -1;
@@ -1556,7 +1606,7 @@ tr292:
     }
 	goto st244;
 tr296:
-#line 650 "uri_parser.rl"
+#line 700 "uri_parser.rl"
 	{
         if (p == mark)
             authority.port = -1;
@@ -1569,7 +1619,7 @@ st244:
 	if ( ++p == pe )
 		goto _test_eof244;
 case 244:
-#line 1573 "uri.d"
+#line 1623 "uri.d"
 	switch( (*p) ) {
 		case 33u: goto tr284;
 		case 35u: goto tr285;
@@ -1591,18 +1641,18 @@ case 244:
 		goto tr284;
 	goto st0;
 tr284:
-#line 702 "uri_parser.rl"
+#line 752 "uri_parser.rl"
 	{
         path.type = URI.Path.Type.ABSOLUTE;
     }
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st245;
 st245:
 	if ( ++p == pe )
 		goto _test_eof245;
 case 245:
-#line 1606 "uri.d"
+#line 1656 "uri.d"
 	switch( (*p) ) {
 		case 33u: goto st245;
 		case 35u: goto tr240;
@@ -1624,18 +1674,18 @@ case 245:
 		goto st245;
 	goto st0;
 tr286:
-#line 702 "uri_parser.rl"
+#line 752 "uri_parser.rl"
 	{
         path.type = URI.Path.Type.ABSOLUTE;
     }
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st23;
 st23:
 	if ( ++p == pe )
 		goto _test_eof23;
 case 23:
-#line 1639 "uri.d"
+#line 1689 "uri.d"
 	if ( (*p) < 65u ) {
 		if ( 48u <= (*p) && (*p) <= 57u )
 			goto st24;
@@ -1659,16 +1709,16 @@ case 24:
 		goto st245;
 	goto st0;
 tr309:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
-#line 663 "uri_parser.rl"
+#line 713 "uri_parser.rl"
 	{
         authority.host = unescape(mark[0..p - mark]);
         mark = null;
     }
 	goto st246;
 tr282:
-#line 663 "uri_parser.rl"
+#line 713 "uri_parser.rl"
 	{
         authority.host = unescape(mark[0..p - mark]);
         mark = null;
@@ -1678,7 +1728,7 @@ st246:
 	if ( ++p == pe )
 		goto _test_eof246;
 case 246:
-#line 1682 "uri.d"
+#line 1732 "uri.d"
 	switch( (*p) ) {
 		case 35u: goto tr291;
 		case 47u: goto tr292;
@@ -1689,14 +1739,14 @@ case 246:
 		goto tr293;
 	goto st0;
 tr293:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st247;
 st247:
 	if ( ++p == pe )
 		goto _test_eof247;
 case 247:
-#line 1700 "uri.d"
+#line 1750 "uri.d"
 	switch( (*p) ) {
 		case 35u: goto tr295;
 		case 47u: goto tr296;
@@ -1842,14 +1892,14 @@ case 32:
 		goto st15;
 	goto st0;
 tr268:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st252;
 st252:
 	if ( ++p == pe )
 		goto _test_eof252;
 case 252:
-#line 1853 "uri.d"
+#line 1903 "uri.d"
 	switch( (*p) ) {
 		case 33u: goto st252;
 		case 35u: goto tr280;
@@ -1873,14 +1923,14 @@ case 252:
 		goto st252;
 	goto st0;
 tr270:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st33;
 st33:
 	if ( ++p == pe )
 		goto _test_eof33;
 case 33:
-#line 1884 "uri.d"
+#line 1934 "uri.d"
 	if ( (*p) < 65u ) {
 		if ( 48u <= (*p) && (*p) <= 57u )
 			goto st34;
@@ -1904,16 +1954,16 @@ case 34:
 		goto st252;
 	goto st0;
 tr276:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
-#line 663 "uri_parser.rl"
+#line 713 "uri_parser.rl"
 	{
         authority.host = unescape(mark[0..p - mark]);
         mark = null;
     }
 	goto st253;
 tr301:
-#line 663 "uri_parser.rl"
+#line 713 "uri_parser.rl"
 	{
         authority.host = unescape(mark[0..p - mark]);
         mark = null;
@@ -1923,7 +1973,7 @@ st253:
 	if ( ++p == pe )
 		goto _test_eof253;
 case 253:
-#line 1927 "uri.d"
+#line 1977 "uri.d"
 	switch( (*p) ) {
 		case 33u: goto st35;
 		case 35u: goto tr291;
@@ -2003,16 +2053,16 @@ case 37:
 		goto st35;
 	goto st0;
 tr40:
-#line 658 "uri_parser.rl"
+#line 708 "uri_parser.rl"
 	{
         authority.userinfo = unescape(mark[0..p - mark]);
         mark = null;
     }
 	goto st254;
 tr278:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
-#line 658 "uri_parser.rl"
+#line 708 "uri_parser.rl"
 	{
         authority.userinfo = unescape(mark[0..p - mark]);
         mark = null;
@@ -2022,7 +2072,7 @@ st254:
 	if ( ++p == pe )
 		goto _test_eof254;
 case 254:
-#line 2026 "uri.d"
+#line 2076 "uri.d"
 	switch( (*p) ) {
 		case 2u: goto tr267;
 		case 33u: goto tr303;
@@ -2054,14 +2104,14 @@ case 254:
 		goto tr308;
 	goto st0;
 tr303:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st255;
 st255:
 	if ( ++p == pe )
 		goto _test_eof255;
 case 255:
-#line 2065 "uri.d"
+#line 2115 "uri.d"
 	switch( (*p) ) {
 		case 33u: goto st255;
 		case 35u: goto tr280;
@@ -2084,14 +2134,14 @@ case 255:
 		goto st255;
 	goto st0;
 tr304:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st38;
 st38:
 	if ( ++p == pe )
 		goto _test_eof38;
 case 38:
-#line 2095 "uri.d"
+#line 2145 "uri.d"
 	if ( (*p) < 65u ) {
 		if ( 48u <= (*p) && (*p) <= 57u )
 			goto st39;
@@ -2115,14 +2165,14 @@ case 39:
 		goto st255;
 	goto st0;
 tr305:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st256;
 st256:
 	if ( ++p == pe )
 		goto _test_eof256;
 case 256:
-#line 2126 "uri.d"
+#line 2176 "uri.d"
 	switch( (*p) ) {
 		case 33u: goto st255;
 		case 35u: goto tr280;
@@ -2536,14 +2586,14 @@ case 269:
 		goto st255;
 	goto st0;
 tr306:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st270;
 st270:
 	if ( ++p == pe )
 		goto _test_eof270;
 case 270:
-#line 2547 "uri.d"
+#line 2597 "uri.d"
 	switch( (*p) ) {
 		case 33u: goto st255;
 		case 35u: goto tr280;
@@ -2571,14 +2621,14 @@ case 270:
 		goto st271;
 	goto st0;
 tr308:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st271;
 st271:
 	if ( ++p == pe )
 		goto _test_eof271;
 case 271:
-#line 2582 "uri.d"
+#line 2632 "uri.d"
 	switch( (*p) ) {
 		case 33u: goto st255;
 		case 35u: goto tr280;
@@ -2606,14 +2656,14 @@ case 271:
 		goto st256;
 	goto st0;
 tr307:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st272;
 st272:
 	if ( ++p == pe )
 		goto _test_eof272;
 case 272:
-#line 2617 "uri.d"
+#line 2667 "uri.d"
 	switch( (*p) ) {
 		case 33u: goto st255;
 		case 35u: goto tr280;
@@ -2674,14 +2724,14 @@ case 273:
 		goto st255;
 	goto st0;
 tr279:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st40;
 st40:
 	if ( ++p == pe )
 		goto _test_eof40;
 case 40:
-#line 2685 "uri.d"
+#line 2735 "uri.d"
 	switch( (*p) ) {
 		case 58u: goto st148;
 		case 118u: goto st227;
@@ -5626,14 +5676,14 @@ case 230:
 		goto st230;
 	goto st0;
 tr302:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st274;
 st274:
 	if ( ++p == pe )
 		goto _test_eof274;
 case 274:
-#line 5637 "uri.d"
+#line 5687 "uri.d"
 	switch( (*p) ) {
 		case 33u: goto st35;
 		case 35u: goto tr295;
@@ -5662,14 +5712,14 @@ case 274:
 		goto st35;
 	goto st0;
 tr272:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st275;
 st275:
 	if ( ++p == pe )
 		goto _test_eof275;
 case 275:
-#line 5673 "uri.d"
+#line 5723 "uri.d"
 	switch( (*p) ) {
 		case 33u: goto st252;
 		case 35u: goto tr280;
@@ -6097,14 +6147,14 @@ case 288:
 		goto st252;
 	goto st0;
 tr273:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st289;
 st289:
 	if ( ++p == pe )
 		goto _test_eof289;
 case 289:
-#line 6108 "uri.d"
+#line 6158 "uri.d"
 	switch( (*p) ) {
 		case 33u: goto st252;
 		case 35u: goto tr280;
@@ -6133,14 +6183,14 @@ case 289:
 		goto st290;
 	goto st0;
 tr275:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st290;
 st290:
 	if ( ++p == pe )
 		goto _test_eof290;
 case 290:
-#line 6144 "uri.d"
+#line 6194 "uri.d"
 	switch( (*p) ) {
 		case 33u: goto st252;
 		case 35u: goto tr280;
@@ -6169,14 +6219,14 @@ case 290:
 		goto st275;
 	goto st0;
 tr274:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st291;
 st291:
 	if ( ++p == pe )
 		goto _test_eof291;
 case 291:
-#line 6180 "uri.d"
+#line 6230 "uri.d"
 	switch( (*p) ) {
 		case 33u: goto st252;
 		case 35u: goto tr280;
@@ -6538,7 +6588,7 @@ case 292:
 	switch ( cs ) {
 	case 247: 
 	case 274: 
-#line 650 "uri_parser.rl"
+#line 700 "uri_parser.rl"
 	{
         if (p == mark)
             authority.port = -1;
@@ -6590,7 +6640,7 @@ case 292:
 	case 290: 
 	case 291: 
 	case 292: 
-#line 663 "uri_parser.rl"
+#line 713 "uri_parser.rl"
 	{
         authority.host = unescape(mark[0..p - mark]);
         mark = null;
@@ -6600,34 +6650,34 @@ case 292:
 	case 236: 
 	case 239: 
 	case 245: 
-#line 691 "uri_parser.rl"
+#line 741 "uri_parser.rl"
 	{
         path.segments ~= unescape(mark[0..p - mark]);
         mark = null;
     }
 	break;
 	case 241: 
-#line 702 "uri_parser.rl"
+#line 752 "uri_parser.rl"
 	{
         path.type = URI.Path.Type.ABSOLUTE;
     }
 	break;
 	case 231: 
 	case 240: 
-#line 706 "uri_parser.rl"
+#line 756 "uri_parser.rl"
 	{
         path.type = URI.Path.Type.RELATIVE;
     }
 	break;
 	case 238: 
-#line 718 "uri_parser.rl"
+#line 768 "uri_parser.rl"
 	{
         query = unescape(mark[0..p - mark]);
         mark = null;
     }
 	break;
 	case 234: 
-#line 723 "uri_parser.rl"
+#line 773 "uri_parser.rl"
 	{
         fragment = unescape(mark[0..p - mark]);
         mark = null;
@@ -6635,9 +6685,9 @@ case 292:
 	break;
 	case 246: 
 	case 253: 
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
-#line 650 "uri_parser.rl"
+#line 700 "uri_parser.rl"
 	{
         if (p == mark)
             authority.port = -1;
@@ -6648,62 +6698,62 @@ case 292:
 	break;
 	case 242: 
 	case 254: 
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
-#line 663 "uri_parser.rl"
+#line 713 "uri_parser.rl"
 	{
         authority.host = unescape(mark[0..p - mark]);
         mark = null;
     }
 	break;
 	case 235: 
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
-#line 691 "uri_parser.rl"
+#line 741 "uri_parser.rl"
 	{
         path.segments ~= unescape(mark[0..p - mark]);
         mark = null;
     }
 	break;
 	case 237: 
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
-#line 718 "uri_parser.rl"
+#line 768 "uri_parser.rl"
 	{
         query = unescape(mark[0..p - mark]);
         mark = null;
     }
 	break;
 	case 233: 
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
-#line 723 "uri_parser.rl"
+#line 773 "uri_parser.rl"
 	{
         fragment = unescape(mark[0..p - mark]);
         mark = null;
     }
 	break;
 	case 244: 
-#line 702 "uri_parser.rl"
+#line 752 "uri_parser.rl"
 	{
         path.type = URI.Path.Type.ABSOLUTE;
     }
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
-#line 691 "uri_parser.rl"
+#line 741 "uri_parser.rl"
 	{
         path.segments ~= unescape(mark[0..p - mark]);
         mark = null;
     }
 	break;
-#line 6700 "uri.d"
+#line 6750 "uri.d"
 		default: break;
 	}
 	}
 
 	_out: {}
 	}
-#line 770 "uri_parser.rl"
+#line 820 "uri_parser.rl"
         }
     }
 
@@ -6726,14 +6776,14 @@ private class URIPathParser : RagelParser
 {
 private:
     
-#line 6730 "uri.d"
+#line 6780 "uri.d"
 static const int uri_path_parser_start = 5;
 static const int uri_path_parser_first_final = 5;
 static const int uri_path_parser_error = 0;
 
 static const int uri_path_parser_en_main = 5;
 
-#line 796 "uri_parser.rl"
+#line 846 "uri_parser.rl"
 
 
 public:
@@ -6746,18 +6796,18 @@ public:
     {
         super.init();
         
-#line 6750 "uri.d"
+#line 6800 "uri.d"
 	{
 	cs = uri_path_parser_start;
 	}
-#line 808 "uri_parser.rl"
+#line 858 "uri_parser.rl"
     }
 
 protected:
     void exec()
     {
         
-#line 6761 "uri.d"
+#line 6811 "uri.d"
 	{
 	if ( p == pe )
 		goto _test_eof;
@@ -6786,22 +6836,22 @@ st0:
 cs = 0;
 	goto _out;
 tr5:
-#line 706 "uri_parser.rl"
+#line 756 "uri_parser.rl"
 	{
         path.type = URI.Path.Type.RELATIVE;
     }
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st6;
 tr10:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st6;
 st6:
 	if ( ++p == pe )
 		goto _test_eof6;
 case 6:
-#line 6805 "uri.d"
+#line 6855 "uri.d"
 	switch( (*p) ) {
 		case 33u: goto st6;
 		case 37u: goto st1;
@@ -6821,22 +6871,22 @@ case 6:
 		goto st6;
 	goto st0;
 tr6:
-#line 706 "uri_parser.rl"
+#line 756 "uri_parser.rl"
 	{
         path.type = URI.Path.Type.RELATIVE;
     }
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st1;
 tr11:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st1;
 st1:
 	if ( ++p == pe )
 		goto _test_eof1;
 case 1:
-#line 6840 "uri.d"
+#line 6890 "uri.d"
 	if ( (*p) < 65u ) {
 		if ( 48u <= (*p) && (*p) <= 57u )
 			goto st2;
@@ -6860,16 +6910,16 @@ case 2:
 		goto st6;
 	goto st0;
 tr9:
-#line 691 "uri_parser.rl"
+#line 741 "uri_parser.rl"
 	{
         path.segments ~= unescape(mark[0..p - mark]);
         mark = null;
     }
 	goto st7;
 tr12:
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
-#line 691 "uri_parser.rl"
+#line 741 "uri_parser.rl"
 	{
         path.segments ~= unescape(mark[0..p - mark]);
         mark = null;
@@ -6879,7 +6929,7 @@ st7:
 	if ( ++p == pe )
 		goto _test_eof7;
 case 7:
-#line 6883 "uri.d"
+#line 6933 "uri.d"
 	switch( (*p) ) {
 		case 33u: goto tr10;
 		case 37u: goto tr11;
@@ -6899,20 +6949,20 @@ case 7:
 		goto tr10;
 	goto st0;
 tr17:
-#line 691 "uri_parser.rl"
+#line 741 "uri_parser.rl"
 	{
         path.segments ~= unescape(mark[0..p - mark]);
         mark = null;
     }
 	goto st8;
 tr15:
-#line 702 "uri_parser.rl"
+#line 752 "uri_parser.rl"
 	{
         path.type = URI.Path.Type.ABSOLUTE;
     }
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
-#line 691 "uri_parser.rl"
+#line 741 "uri_parser.rl"
 	{
         path.segments ~= unescape(mark[0..p - mark]);
         mark = null;
@@ -6922,7 +6972,7 @@ st8:
 	if ( ++p == pe )
 		goto _test_eof8;
 case 8:
-#line 6926 "uri.d"
+#line 6976 "uri.d"
 	switch( (*p) ) {
 		case 33u: goto tr13;
 		case 37u: goto tr14;
@@ -6942,18 +6992,18 @@ case 8:
 		goto tr13;
 	goto st0;
 tr13:
-#line 702 "uri_parser.rl"
+#line 752 "uri_parser.rl"
 	{
         path.type = URI.Path.Type.ABSOLUTE;
     }
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st9;
 st9:
 	if ( ++p == pe )
 		goto _test_eof9;
 case 9:
-#line 6957 "uri.d"
+#line 7007 "uri.d"
 	switch( (*p) ) {
 		case 33u: goto st9;
 		case 37u: goto st3;
@@ -6973,18 +7023,18 @@ case 9:
 		goto st9;
 	goto st0;
 tr14:
-#line 702 "uri_parser.rl"
+#line 752 "uri_parser.rl"
 	{
         path.type = URI.Path.Type.ABSOLUTE;
     }
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
 	goto st3;
 st3:
 	if ( ++p == pe )
 		goto _test_eof3;
 case 3:
-#line 6988 "uri.d"
+#line 7038 "uri.d"
 	if ( (*p) < 65u ) {
 		if ( 48u <= (*p) && (*p) <= 57u )
 			goto st4;
@@ -7024,48 +7074,48 @@ case 4:
 	switch ( cs ) {
 	case 6: 
 	case 9: 
-#line 691 "uri_parser.rl"
+#line 741 "uri_parser.rl"
 	{
         path.segments ~= unescape(mark[0..p - mark]);
         mark = null;
     }
 	break;
 	case 5: 
-#line 706 "uri_parser.rl"
+#line 756 "uri_parser.rl"
 	{
         path.type = URI.Path.Type.RELATIVE;
     }
 	break;
 	case 7: 
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
-#line 691 "uri_parser.rl"
+#line 741 "uri_parser.rl"
 	{
         path.segments ~= unescape(mark[0..p - mark]);
         mark = null;
     }
 	break;
 	case 8: 
-#line 702 "uri_parser.rl"
+#line 752 "uri_parser.rl"
 	{
         path.type = URI.Path.Type.ABSOLUTE;
     }
-#line 640 "uri_parser.rl"
+#line 690 "uri_parser.rl"
 	{ mark = p; }
-#line 691 "uri_parser.rl"
+#line 741 "uri_parser.rl"
 	{
         path.segments ~= unescape(mark[0..p - mark]);
         mark = null;
     }
 	break;
-#line 7062 "uri.d"
+#line 7112 "uri.d"
 		default: break;
 	}
 	}
 
 	_out: {}
 	}
-#line 814 "uri_parser.rl"
+#line 864 "uri_parser.rl"
     }
 
 public:

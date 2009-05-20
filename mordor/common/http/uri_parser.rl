@@ -278,14 +278,21 @@ struct URI
                        int defaultPort = -1, bool emptyPortValid = false)
         {
             _host = toLower(_host);
-            if (port == defaultPort)
-                port = -1;
-            if (port == -1 && !emptyPortValid)
-                portDefined = false;
+            if (_port == defaultPort)
+                _port = -1;
+            if (_port == -1 && !emptyPortValid)
+                _portDefined = false;
             if (_host == defaultHost)
                 _host.length = 0;
-            if (_host.length == 0 && !emptyHostValid && !userinfoDefined && !portDefined)
-                hostDefined = false;
+            if (_host.length == 0 && !emptyHostValid && !userinfoDefined && !_portDefined)
+                _hostDefined = false;
+        }
+        
+        bool opEquals(ref Authority rhs)
+        {
+            return _userinfo == rhs._userinfo && _host == rhs._host &&
+                _port == rhs._port && _userinfoDefined == rhs._userinfoDefined &&
+                _hostDefined == rhs._hostDefined && _portDefined == rhs._portDefined;
         }
     private:
         string _userinfo, _host;
@@ -404,6 +411,11 @@ struct URI
                 segments = rhs.segments;
             return *this;
         }
+        
+        bool opEquals(ref Path rhs)
+        {
+            return type == rhs.type && segments == rhs.segments;
+        }
 
         string[] segments;
     }
@@ -498,7 +510,11 @@ struct URI
 
     void normalize()
     {
-        _scheme = toLower(_scheme);
+        if (_scheme.length > 0) {
+            string newScheme;
+            newScheme.length = _scheme.length;
+            _scheme = toLower(_scheme, newScheme);
+        }
         switch(_scheme) {
             case "http":
             case "https":
@@ -516,6 +532,40 @@ struct URI
         }
     }
     
+    bool opEquals(ref URI rhs)
+    {
+        return _scheme == rhs._scheme && authority == rhs.authority &&
+               path == rhs.path && _query == rhs._query && _fragment == rhs._fragment &&
+               _schemeDefined == rhs._schemeDefined && _queryDefined == rhs._queryDefined &&
+               _fragmentDefined == rhs._fragmentDefined;
+    }
+    
+    unittest
+    {
+        URI lhs = "example://a/b/c/%7Bfoo%7D";
+        URI rhs = "eXAMPLE://a/./b/../b/%63/%7bfoo%7d";
+        
+        lhs.normalize();
+        rhs.normalize();
+        assert(lhs._schemeDefined == rhs._schemeDefined);
+        assert(lhs._scheme == rhs._scheme);
+        assert(lhs.authority._portDefined == rhs.authority._portDefined);
+        assert(lhs.authority._port == rhs.authority._port);
+        assert(lhs.authority._hostDefined == rhs.authority._hostDefined);
+        assert(lhs.authority._host == rhs.authority._host);
+        assert(lhs.authority._userinfoDefined == rhs.authority._userinfoDefined);
+        assert(lhs.authority._userinfo == rhs.authority._userinfo);
+        assert(lhs.authority == rhs.authority);
+        assert(lhs.path.type == rhs.path.type);
+        assert(lhs.path.segments == rhs.path.segments);
+        assert(lhs.path == rhs.path);
+        assert(lhs._queryDefined == rhs._queryDefined);
+        assert(lhs._query == rhs._query);
+        assert(lhs._fragmentDefined == rhs._fragmentDefined);
+        assert(lhs._fragment == rhs._fragment);
+        assert(lhs == rhs);
+    }
+
     static URI transform(URI base, URI relative)
     in
     {
