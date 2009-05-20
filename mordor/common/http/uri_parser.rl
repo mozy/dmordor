@@ -358,6 +358,7 @@ struct URI
                 if (segments[i] == "..") {
                     if (i == 0) {
                         segments = segments[1..$];
+                        --i;
                         continue;
                     }
                     if (i + 1 == segments.length) {
@@ -554,8 +555,8 @@ struct URI
                         target.path.merge(relative.path);
                         if (!base.authority.hostDefined)
                             target.path.type = Path.Type.ABSOLUTE;
-                        target.path.removeDotComponents();
                     }
+                    target.path.removeDotComponents();
                     target._query = relative._query;
                     target._queryDefined = relative._queryDefined;
                 }
@@ -595,6 +596,30 @@ struct URI
         assert(transform(base, URI("../..")).toString() == "http://a/");
         assert(transform(base, URI("../../")).toString() == "http://a/");
         assert(transform(base, URI("../../g")).toString() == "http://a/g");
+        
+        assert(transform(base, URI("../../../g")).toString() == "http://a/g");
+        assert(transform(base, URI("../../../../g")).toString() == "http://a/g");
+        
+        assert(transform(base, URI("/./g")).toString() == "http://a/g");
+        assert(transform(base, URI("/../g")).toString() == "http://a/g");
+        assert(transform(base, URI("g.")).toString() == "http://a/b/c/g.");
+        assert(transform(base, URI(".g")).toString() == "http://a/b/c/.g");
+        assert(transform(base, URI("g..")).toString() == "http://a/b/c/g..");
+        assert(transform(base, URI("..g")).toString() == "http://a/b/c/..g");
+        
+        assert(transform(base, URI("./../g")).toString() == "http://a/b/g");
+        assert(transform(base, URI("./g/.")).toString() == "http://a/b/c/g/");
+        assert(transform(base, URI("g/./h")).toString() == "http://a/b/c/g/h");
+        assert(transform(base, URI("g/../h")).toString() == "http://a/b/c/h");
+        assert(transform(base, URI("g;x=1/./y")).toString() == "http://a/b/c/g;x=1/y");
+        assert(transform(base, URI("g;x=1/../y")).toString() == "http://a/b/c/y");
+        
+        assert(transform(base, URI("g?y/./x")).toString() == "http://a/b/c/g?y/./x");
+        assert(transform(base, URI("g?y/../x")).toString() == "http://a/b/c/g?y/../x");
+        assert(transform(base, URI("g#s/./x")).toString() == "http://a/b/c/g#s/./x");
+        assert(transform(base, URI("g#s/../x")).toString() == "http://a/b/c/g#s/../x");
+        
+        assert(transform(base, URI("http:g")).toString() == "http:g");
     }
 
 private:
