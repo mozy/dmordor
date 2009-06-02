@@ -100,6 +100,14 @@ class Database
         return new ResultSet(this, stmt);
     }
 
+    T transaction(T)(T delegate() dg)
+    {
+        begin();
+        scope(success) commit();
+        scope(failure) rollback();
+        return dg();
+    }
+
     void begin()
     {
         executeUpdate("BEGIN");
