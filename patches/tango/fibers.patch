@@ -1,7 +1,7 @@
 diff --git a/git-svn:lib/common/tango/core/Thread.d b/master:lib/common/tango/core/Thread.d
 index 824e7a6..e958c30 100644
---- a/git-svn:lib/common/tango/core/Thread.d
-+++ b/master:lib/common/tango/core/Thread.d
+--- lib/common/tango/core/Thread.d
++++ lib/common/tango/core/Thread.d
 @@ -83,6 +83,7 @@ version( Win32 )
          //
          extern (Windows) alias uint function(void*) btex_fptr;

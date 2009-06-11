@@ -2,7 +2,7 @@ diff --git a/tango/sys/linux/inotify.d b/tango/sys/linux/inotify.d
 new file mode 100644
 index 0000000..83f086d
 --- /dev/null
-+++ b/tango/sys/linux/inotify.d
++++ tango/sys/linux/inotify.d
 @@ -0,0 +1,59 @@
 +module tango.sys.linux.inotify;
 +
